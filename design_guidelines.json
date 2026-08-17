@@ -1,0 +1,47 @@
+{
+  "app_name": "ReviewBoost Mobile & Web",
+  "archetype": "ORGANIC & EARTHY & PERFORMANCE PRO",
+  "typography": {
+    "heading_font": "Plus Jakarta Sans, sans-serif",
+    "body_font": "Inter, sans-serif",
+    "mono_font": "JetBrains Mono, monospace",
+    "hierarchy": {
+      "h1": "text-4xl sm:text-5xl lg:text-6xl tracking-tight font-extrabold",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl tracking-tight font-bold",
+      "h3": "text-xl sm:text-2xl font-semibold",
+      "h4": "text-lg sm:text-xl font-medium",
+      "body": "text-base leading-relaxed",
+      "small": "text-sm text-slate-500 font-normal"
+    }
+  },
+  "colors": {
+    "primary": "#10B981",
+    "primary_hover": "#059669",
+    "accent": "#6366F1",
+    "background_light": "#F8FAFC",
+    "background_dark": "#0A0A0A",
+    "card_light": "#FFFFFF",
+    "card_dark": "#171717",
+    "border_light": "#E2E8F0",
+    "border_dark": "#262626",
+    "forbidden_color": "#7351B7"
+  },
+  "visual_enhancers": {
+    "glassmorphism": "backdrop-blur-xl bg-white/80 dark:bg-black/70 border border-slate-200/50 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08)]",
+    "rounded_scale": "rounded-2xl",
+    "subtle_glow": "shadow-[0_0_20px_rgba(16,185,129,0.15)]"
+  },
+  "component_path": "/app/frontend/src/components",
+  "instructions_to_main_agent": "Implement a full stack review booster web application with JWT & Google login, business profile configuration (name, category, keywords, Google review URL), AI review draft generator (20 short natural stories using GPT-4o-mini/GPT-5.4 via Emergent LLM key), full CRUD/reorder/regenerate on drafts, duplicate warning detection, unique public review link at /r/:slug with least-recently-used rotation & hiding recently shown drafts in session, instant clipboard copy & automatic redirect to Google review URL, downloadable QR code poster, and owner dashboard with lifetime usage counter. Ensure responsive mobile-first UI with data-testid attributes on all interactive elements.",
+  "image_urls": {
+    "salon_storefront": "https://images.unsplash.com/photo-1785594732247-d874f32fb1f1?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDR8MHwxfHNlYXJjaHwxfHxsb2NhbCUyMGJ1c2luZXNzJTIwc2Fsb24lMjBzdG9yZWZyb250JTIwaW50ZXJpb3J8ZW58MHx8fHwxNzg2OTc1OTg2fDA&ixlib=rb-4.1.0&q=85",
+    "happy_customer": "https://images.pexels.com/photos/20095349/pexels-photo-20095349.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+    "qr_mockup": "https://images.unsplash.com/photo-1600147131759-880e94a6185f?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDR8MHwxfHNlYXJjaHwyfHxxciUyMGNvZGUlMjBzY2FuJTIwbW9iaWxlJTIwcGhvbmUlMjBtb2NrdXB8ZW58MHx8fHwxNzg2OTc1OTg2fDA&ixlib=rb-4.1.0&q=85"
+  },
+  "universal_guidelines": [
+    "Always use data-testid on interactive elements",
+    "Never use full transparent backgrounds in headers or dropdowns",
+    "Respect mobile-first design with generous spacing",
+    "Ensure robust error handling and toast notifications via Sonner"
+  ]
+}
