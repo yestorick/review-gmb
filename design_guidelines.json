@@ -1,47 +1,101 @@
 {
-  "app_name": "ReviewBoost Mobile & Web",
-  "archetype": "ORGANIC & EARTHY & PERFORMANCE PRO",
-  "typography": {
-    "heading_font": "Plus Jakarta Sans, sans-serif",
-    "body_font": "Inter, sans-serif",
-    "mono_font": "JetBrains Mono, monospace",
-    "hierarchy": {
-      "h1": "text-4xl sm:text-5xl lg:text-6xl tracking-tight font-extrabold",
-      "h2": "text-2xl sm:text-3xl lg:text-4xl tracking-tight font-bold",
-      "h3": "text-xl sm:text-2xl font-semibold",
-      "h4": "text-lg sm:text-xl font-medium",
-      "body": "text-base leading-relaxed",
-      "small": "text-sm text-slate-500 font-normal"
-    }
+  "project": "ReviewBoost",
+  "context": "Hybrid fullstack mobile-first web app for local business owners and their customers",
+  "phase_1_discovery": {
+    "audience": ["local business owners with limited time and technical confidence", "customers leaving a quick Google review on mobile"],
+    "primary_tasks": ["sign up and configure business profile", "add keyword tags", "generate and manage 20 natural review drafts", "share a public review link or QR code", "copy a selected draft and finish on Google", "track lifetime usage"],
+    "success_actions": ["complete business setup", "generate drafts", "download/share QR", "customer copies a draft and clicks through to Google"],
+    "emotional_tone": "clean, credible, calm momentum; generous enough to feel premium but practical enough for a busy owner",
+    "theme": "light-first with optional dark mode reserved for future settings; the public flow stays light for trust and speed",
+    "fusion": ["Swiss editorial grids for clarity", "print-shop proof sheets for the review drafts", "wayfinding signage and blue ink for local trust"]
   },
-  "colors": {
-    "primary": "#10B981",
-    "primary_hover": "#059669",
-    "accent": "#6366F1",
-    "background_light": "#F8FAFC",
-    "background_dark": "#0A0A0A",
-    "card_light": "#FFFFFF",
-    "card_dark": "#171717",
-    "border_light": "#E2E8F0",
-    "border_dark": "#262626",
-    "forbidden_color": "#7351B7"
+  "design_directions": [
+    {"name":"Blue Proof Sheet","probability":0.34,"description":"A crisp editorial dashboard where review drafts feel like stamped copy proofs; cobalt blue signals action, warm paper surfaces signal humanity.","best_for":"owner dashboard and public selection"},
+    {"name":"Local Signal","probability":0.24,"description":"Wayfinding-inspired UI with oversized directional labels, route lines, and a QR/share module that feels like a storefront sign.","best_for":"share/link and customer handoff"},
+    {"name":"Quiet Counter","probability":0.18,"description":"A restrained café-counter aesthetic: ink blue, bone white, small receipt-like metadata, and soft physical shadows.","best_for":"trust-led onboarding"},
+    {"name":"Review Radio","probability":0.14,"description":"A more expressive option using broadcast-style numbered drafts and a live frequency motif without neon or gradients.","best_for":"draft generation moments"},
+    {"name":"Neighborhood Ledger","probability":0.10,"description":"A compact ledger language with visible grid rules, mono metadata, and blue as functional color only.","best_for":"high-density management views"}
+  ],
+  "research": {
+    "references": [
+      {"source":"Fondly / Broadly / GoodMarks review platforms","descriptor":"Position review growth as a guided action rather than a passive analytics dashboard; keep human oversight visible."},
+      {"source":"SaaSFrame onboarding patterns","descriptor":"Use a setup progress state, meaningful empty states, and a clear next-best action so the first dashboard is never blank."},
+      {"source":"Provided prototype screenshot","descriptor":"Retain the clean minimal composition, pale background, dark ink typography, compact mono labels, and generous whitespace; replace mint/coral accents with a more ownable blue system."}
+    ],
+    "reference_url":"https://customer-assets-0z36b82j.emergentagent.net/job_quick-review-boost/artifacts/u49xj5em_32ba1bf3db885c942fb73cc06219b688.jpg",
+    "note":"The supplied reference is a JPEG asset and could not be text-scraped; its visual direction is captured from the problem statement and existing prototype CSS."
   },
-  "visual_enhancers": {
-    "glassmorphism": "backdrop-blur-xl bg-white/80 dark:bg-black/70 border border-slate-200/50 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08)]",
-    "rounded_scale": "rounded-2xl",
-    "subtle_glow": "shadow-[0_0_20px_rgba(16,185,129,0.15)]"
+  "design_decisions": {
+    "chosen_direction":"Blue Proof Sheet",
+    "typography": {
+      "heading":"Manrope 800/700, tight tracking",
+      "body":"Manrope 400/500",
+      "metadata":"DM Mono 400/500, uppercase, tracking 0.16em",
+      "rules":["H1 max text-6xl; dashboard hero should use text-5xl or clamp equivalent", "H2 text-2xl to text-4xl", "body text-base, mobile text-sm", "never use Inter, Roboto, Open Sans, or Lato for headings", "headings leading-none or tight; body leading-relaxed"]
+    },
+    "colors": {
+      "archetype":"Swiss & high-contrast with warm paper tint",
+      "paper":"#F7F9FC",
+      "surface":"#FFFFFF",
+      "ink":"#172131",
+      "muted":"#637184",
+      "line":"#D8E0EA",
+      "primary_blue":"#155EEF",
+      "primary_blue_dark":"#1048B8",
+      "blue_wash":"#EAF1FF",
+      "success":"#167A52",
+      "warning":"#A05A00",
+      "danger":"#B42318",
+      "rule":"Use blue only for CTA, active states, links, focus, and progress. No full-screen gradient. Never use pure black or neutral gray; retain blue-tinted neutrals."
+    },
+    "visual_enhancers": ["subtle paper grain/noise overlay at 3-5% opacity", "1px grid borders and proof-sheet dividers", "layered ambient and direct shadows only on interactive surfaces", "small blue registration marks and numbered labels as decorative details", "custom scrollbar with tinted thumb and no gutter"]
   },
-  "component_path": "/app/frontend/src/components",
-  "instructions_to_main_agent": "Implement a full stack review booster web application with JWT & Google login, business profile configuration (name, category, keywords, Google review URL), AI review draft generator (20 short natural stories using GPT-4o-mini/GPT-5.4 via Emergent LLM key), full CRUD/reorder/regenerate on drafts, duplicate warning detection, unique public review link at /r/:slug with least-recently-used rotation & hiding recently shown drafts in session, instant clipboard copy & automatic redirect to Google review URL, downloadable QR code poster, and owner dashboard with lifetime usage counter. Ensure responsive mobile-first UI with data-testid attributes on all interactive elements.",
-  "image_urls": {
-    "salon_storefront": "https://images.unsplash.com/photo-1785594732247-d874f32fb1f1?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDR8MHwxfHNlYXJjaHwxfHxsb2NhbCUyMGJ1c2luZXNzJTIwc2Fsb24lMjBzdG9yZWZyb250JTIwaW50ZXJpb3J8ZW58MHx8fHwxNzg2OTc1OTg2fDA&ixlib=rb-4.1.0&q=85",
-    "happy_customer": "https://images.pexels.com/photos/20095349/pexels-photo-20095349.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
-    "qr_mockup": "https://images.unsplash.com/photo-1600147131759-880e94a6185f?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDR8MHwxfHNlYXJjaHwyfHxxciUyMGNvZGUlMjBzY2FuJTIwbW9iaWxlJTIwcGhvbmUlMjBtb2NrdXB8ZW58MHx8fHwxNzg2OTc1OTg2fDA&ixlib=rb-4.1.0&q=85"
+  "component_name": "ReviewBoost UI system",
+  "component_path": "/app/frontend/src/components/ui/",
+  "grids": {
+    "dashboard":"High-density responsive grid: grid-cols-1 md:grid-cols-3 lg:grid-cols-4, gap-4 to gap-6; summary metrics span 1, main setup/drafts span 2, share module spans 1 row-span-2.",
+    "marketing_or_auth":"Tetris split: grid-cols-1 lg:grid-cols-12 with art/statement spanning 7-8 columns and form spanning 4-5; do not center everything.",
+    "public":"Single narrow reading column, max-w-xl, left-aligned heading and full-width selectable draft rows.",
+    "spacing":"Use p-6/p-8 inside bordered containers, py-16 to py-24 between major sections, mobile-first.",
+    "alignment":"Grid items are direct children; use align-items-start; only stretch cards that need equal bottoms."
   },
-  "universal_guidelines": [
-    "Always use data-testid on interactive elements",
-    "Never use full transparent backgrounds in headers or dropdowns",
-    "Respect mobile-first design with generous spacing",
-    "Ensure robust error handling and toast notifications via Sonner"
-  ]
+  "layouts": {
+    "owner_dashboard":["solid or crystal-glass header with ReviewBoost logo, Dashboard, Drafts, Share links, Settings, and account CTA/menu visible on desktop", "intro row with setup status and lifetime generation counter", "asymmetric workspace: profile setup left, QR/link share right", "draft manager below with numbered rows, reorder affordance, edit/delete, and Generate 20 drafts CTA", "empty states explain value and provide one next action"],
+    "public_review_page":["no-login, fast-loading page with business name and short instruction", "20 numbered draft rows with copy action and selected state", "prominent finish on Google action after clipboard copy", "small trust/privacy note and no distracting navigation"],
+    "auth":["desktop split layout with editorial statement and form; mobile stacks art above form", "email/password and Google auth use Shadcn Input/Button primitives, customized to brand", "show progress/setup continuation after signup"]
+  },
+  "motion": {
+    "entrance":"stagger dashboard sections by 60ms with opacity and translateY only",
+    "hover":"buttons lift 2px; draft rows lift 1px and strengthen border; explicit hover text colors",
+    "press":"scale 0.98 on CTA press",
+    "clipboard":"brief blue check state and Sonner success toast after copy",
+    "loading":"skeleton rows or a restrained pulsing proof mark while generating",
+    "reduced_motion":"disable transforms, stagger, and decorative motion under prefers-reduced-motion",
+    "implementation":"Use specific transitions such as transition-transform, transition-colors, transition-opacity; never transition-all."
+  },
+  "accessibility": {
+    "contrast":"Meet WCAG AA minimum 4.5:1 for normal text and 3:1 for large text; verify blue buttons use white text.",
+    "focus":"Visible 2px blue focus ring with offset on every control.",
+    "keyboard":"All draft selection, copy, reorder, delete, QR download, and Google redirect actions keyboard reachable with clear labels.",
+    "semantics":"Use buttons for actions, links for navigation, labels for every input, aria-live for generation/copy status.",
+    "testing":"Every interactive and key informational element must include a stable kebab-case data-testid, for example review-draft-copy-button, dashboard-usage-counter, public-google-redirect-link.",
+    "privacy":"Public page exposes only configured business name, keywords/drafts, and required Google destination; never expose owner identity or auth data."
+  },
+  "media": {
+    "strategy":"No stock photography is necessary; the product is content-led and must remain fast. Use CSS paper texture, QR rendering, and tiny inline SVG marks only.",
+    "image_urls": [],
+    "image_categories": {"hero":"none; use layered paper and registration marks", "business_profile":"none by default", "public_page":"none", "logos":"use actual configured business logo only if provided by owner; never invent placeholder logos"}
+  },
+  "3d_libraries": {"decision":"none","reason":"This product needs clarity and speed, not immersion; 3D would distract from the copy/redirect task.","steps":[]},
+  "implementation_instructions": {
+    "file_type":"Use .js/.jsx files, not .tsx.",
+    "framework":"React JS, Tailwind CSS, FastAPI, existing Shadcn primitives.",
+    "forms":"Use Shadcn Input, Select, Form, Checkbox and Dialog logic; do not build advanced interactions from native select/date inputs.",
+    "notifications":"Use Sonner from /app/frontend/src/components/ui/sonner.jsx or the existing project equivalent.",
+    "header":"Every page has a visible branded navigation/header with a non-transparent solid or blurred background; add content offset if sticky.",
+    "security":"Treat review generation as server-side; validate business data and keywords, rate-limit generation, sanitize drafts, protect owner routes, and ensure public IDs are non-guessable.",
+    "mocked_integrations":"AI generation, Google OAuth, Google redirect destination, QR generation, and clipboard behavior must be clearly handled by the real backend/browser APIs where available; do not present MOCKED integrations as complete."
+  },
+  "GENERAL UI UX DESIGN GUIDELINES": ["Avoid generic centered layouts, excessive gradients, and uniform equal cards.", "Use 2-3x more spacing than default instincts; preserve negative space.", "Use layered depth, crisp borders, tinted neutrals, and restrained texture.", "Every interactive element needs hover, active, focus, and reduced-motion behavior.", "Never use emoji characters as icons; use existing icon library or inline SVG.", "Do not use complete transparent backgrounds behind content; use solid or blurred scrims.", "Customize scrollbars without a gutter.", "Keep public customer flow one-handed, fast, and obvious: choose draft, copy, finish on Google.", "Avoid dark colors as gradients; use flat dark surfaces if dark mode is added."],
+  "handoff": {"priority_order":["public no-login flow", "owner setup and generation", "draft CRUD/reorder", "QR/link share", "usage and auth polish"],"definition_of_done":["mobile layout tested at 320px and desktop at 1440px", "all key controls have data-testid", "clipboard and redirect states are explicit", "empty/loading/error states exist", "contrast and keyboard navigation verified"]}
 }
