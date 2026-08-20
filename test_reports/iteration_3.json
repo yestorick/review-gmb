@@ -1,0 +1,42 @@
+{
+  "summary": "Full re-test of the rebuilt ReviewBoost (simple sidebar + table dashboard). Backend: created /app/backend/tests/backend_test.py with 25 pytest cases covering auth (login/me/logout/change-password/bcrypt/cookies), settings GET/PUT + Google-link validation, categories CRUD + duplicate/404, reviews generate/list/edit/regenerate/delete with persistence re-GETs, public page + use (status flip, lifetime counter, session cookie) and QR. 25/25 passed. Frontend: Playwright runs on the preview URL covered login, protected-route redirect, Reviews list (link banner/ACTIVE pill/3 stat tiles/table columns/4 row actions), inline edit + reload persistence, single regenerate (AI text changed), delete (count drop), Add New (prefill from profile, count 10, tone Friendly, language Other -> extra input, 10 reviews generated), Categories add/delete + datalist suggestion, My Business (values, ACTIVE, QR data-url, copy/download buttons, invalid google link error toast, valid save toast), Change Password (wrong current -> error, successful change + reverted back to ReviewBoost123!), public /r/<slug> page on mobile (6 tappable cards, tap -> redirect to Google Maps review URL, USED status + 'Used by customers' count incremented), logout, mobile hamburger open/close. Only 2 cosmetic/CSS issues found; all functional flows pass.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/reviews", "issue": "'used' tile uses business.lifetime_used, which can exceed the number of rows badged USED because regenerate resets a used review back to 'available' and deletes remove used rows. Intentional? If not, stats can look inconsistent (observed used=3 while only 2 rows showed USED)."},
+      {"endpoint": "POST /api/reviews/{id}/regenerate", "issue": "Silently resets status to 'available' for an already USED review, so a customer-consumed review can be recycled without any audit trail."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Sidebar", "issue": "The X (close) button is visible on desktop: styles.css line 36 '.sidebar-close { display: none; }' is overridden by the later, equal-specificity '.icon-btn { display: inline-grid; }' (line 59). Move .sidebar-close below .icon-btn or use 'display: none !important' / a media query for >900px.", "selector": "[data-testid=\"close-sidebar-button\"]", "priority": "LOW"},
+      {"component": "Reviews link banner", "issue": "At 390x844 the long public URL anchor (414px wide) causes page-level horizontal overflow (documentElement.scrollWidth 430 > 390). Add overflow-wrap:anywhere / word-break:break-all to .link-banner a (or max-width:100%). Add New page has no overflow; the table itself is fine because .table-wrap scrolls.", "selector": "[data-testid=\"public-link\"]", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Reviews (mobile 390px)", "issues": ["Copy icon and ACTIVE pill wrap onto their own line below the wrapped URL, looking detached from 'Your review link:'", "3 stat tiles wrap 2+1 leaving an unbalanced row"]},
+      {"screen": "Reviews (desktop)", "issues": ["Delete review and delete category act immediately with no confirmation dialog - easy accidental data loss for non-technical owners"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/backend_test.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Fix .sidebar-close CSS ordering so the X does not show on desktop",
+    "Add word-break/overflow-wrap to the public review link so the Reviews page has no horizontal overflow on mobile",
+    "Decide whether 'Used by customers' should be lifetime_used or the live count of USED rows (currently they can disagree after regenerate/delete)",
+    "Consider a confirm step before deleting a review/category"
+  ],
+  "critical_code_review_comments": [
+    "regenerate_review builds GenerateIn with count=10 then calls generate_reviews(cfg, 1): the prompt asks for 10 reviews and 9 are discarded - wasteful LLM spend, pass count=1 in the prompt.",
+    "GET /api/public/{slug} falls back to returning all rows ('or rows') when every review is hidden by the session cookie, so a repeat customer can be shown an already-used review.",
+    "Frontend Reviews/AddReview pages have no loading skeleton or error state; on a slow /reviews call the page renders 0/0/0 stats which looks like data loss (tests had to add explicit waits because prefill/datalist read as empty for ~2s).",
+    "Old collections review_templates and password_reset_tokens are now unused/dead; /api/auth/forgot-password documented in test_credentials.md no longer exists."
+  ],
+  "updated_files": ["/app/backend/tests/backend_test.py", "/app/test_reports/iteration_3.json"],
+  "success_rate": {"backend": "100% (25/25 pytest)", "frontend": "100% functional flows; 2 cosmetic CSS issues"},
+  "seed_data_creation": "Used the existing demo owner (owner@reviewboost.demo). Created and deleted TEST_ categories and TEST_QA reviews; UI run generated 10 'qa-haircut-check' reviews on the demo account (left in place, total now 24) and consumed 1 review via the public page (status USED).",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "owner@reviewboost.demo / ReviewBoost123! (password was changed twice during tests and restored to ReviewBoost123!, verified by re-login)",
+  "context_for_next_testing_agent": "Public slug for the demo owner is PCiXONhzO_7mFA (NOT 'quick-review-boost' as stated in the request; slug is a random token from settings.business.public_url). Backend regression suite: pytest /app/backend/tests/backend_test.py (pytest.ini forces -n 2 --dist loadscope). Add New form prefill and the category datalist populate ~1-2s after mount, so waits are required before asserting input values.",
+  "rca_of_the_issue": "Desktop X button: CSS cascade - '.sidebar-close{display:none}' declared before '.icon-btn{display:inline-grid}' with identical specificity. Mobile horizontal scroll: the un-broken public URL anchor inside .link-banner is wider than the 390px viewport (no overflow-wrap)."
+}
