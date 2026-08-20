@@ -2,28 +2,19 @@ import { useEffect, useState } from 'react';
 import { Plus, Shapes, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, errText } from '../api';
+import { CategoryModal } from '../components/CategoryModal';
 
 const shortDate = (iso) => new Date(iso).toLocaleDateString('en-GB').replaceAll('/', '-');
 
 export default function Categories() {
   const [rows, setRows] = useState([]);
-  const [name, setName] = useState('');
+  const [showModal, setShowModal] = useState(false);
 
   const load = async () => {
     try { setRows((await api.get('/categories')).data); } catch (x) { toast.error(errText(x)); }
   };
   useEffect(() => { load(); }, []);
 
-  const add = async (e) => {
-    e.preventDefault();
-    if (!name.trim()) return;
-    try {
-      await api.post('/categories', { name: name.trim() });
-      setName('');
-      toast.success('Category added');
-      load();
-    } catch (x) { toast.error(errText(x)); }
-  };
   const remove = async (id) => {
     if (!window.confirm('Delete this category?')) return;
     try { await api.delete(`/categories/${id}`); toast.success('Category deleted'); load(); } catch (x) { toast.error(errText(x)); }
@@ -31,24 +22,15 @@ export default function Categories() {
 
   return (
     <>
+      {showModal && <CategoryModal onClose={() => setShowModal(false)} onCreated={() => { toast.success('Category added'); load(); }} />}
+
       <div className="page-head">
         <div>
           <h1 className="page-title" data-testid="categories-heading">Category List ({rows.length})</h1>
           <p className="page-help">Groups help you keep reviews tidy, like "haircut" or "home delivery".</p>
         </div>
+        <button className="btn btn-primary" onClick={() => setShowModal(true)} data-testid="add-category-button"><Plus size={18} /> ADD NEW</button>
       </div>
-
-      <form className="form-card" onSubmit={add} style={{ marginBottom: 18 }}>
-        <div className="form-grid">
-          <div className="field">
-            <label>New category name</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. haircut" data-testid="new-category-input" />
-          </div>
-          <div className="field" style={{ justifyContent: 'flex-end' }}>
-            <button className="btn btn-primary" type="submit" data-testid="add-category-button"><Plus size={18} /> ADD NEW</button>
-          </div>
-        </div>
-      </form>
 
       <div className="card">
         {rows.length ? (
@@ -68,7 +50,12 @@ export default function Categories() {
             </table>
           </div>
         ) : (
-          <div className="empty"><Shapes size={30} /><strong>No categories yet</strong><span>Add your first group above.</span></div>
+          <div className="empty" data-testid="categories-empty">
+            <Shapes size={30} />
+            <strong>No categories yet</strong>
+            <span>Tap ADD NEW and type a simple group name.</span>
+            <div style={{ marginTop: 18 }}><button className="btn btn-primary" onClick={() => setShowModal(true)}><Plus size={18} /> ADD NEW</button></div>
+          </div>
         )}
       </div>
     </>

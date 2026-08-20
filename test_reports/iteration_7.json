@@ -1,0 +1,41 @@
+{
+  "summary": "Full backend + frontend regression of the 8 owner-requested fixes (iteration 7). Backend: rewrote/extended /app/backend/tests/backend_test.py (81 tests, all passing) — added TestPublicAvailableOnly (available-only public payload, 6-draft cap, zero-available empty payload, parallel-use 409 race, reuse 409), TestGoogleAuth (invalid session_id 401, 422 validation, Google-only user password-login + change-password guards via a minted JWT), TestPasswordReset (forgot-password neutral message + token row creation with email_sent=false, reset full cycle with cookie auth + used flag + reuse/unknown/expired/short-password rejection) and removed the now-obsolete 'used review fallback' assertions. Frontend: 6 Playwright runs covering category modal (all 4 close paths, empty + duplicate inline errors), Add Reviews real <select> + '+ New' auto-select + live 10-review generation carrying the new category, Reviews 'Show category' filter (counts, page reset, Show all, 'No reviews in \"X\"' empty state), My Business Saved/Edit lock with inline invalid-Google-link error, all password eye toggles, inline auth/change-password error+success states, Google button target, forgot-password flow, /reset-password page (no token / bad token / valid token -> auto sign-in), used-reviews-vanish on the public page (fresh browser context + concurrent 409 toast + 'All reviews are taken right now' empty state) and regressions (login/logout, table edit/copy/regenerate/delete, bulk copy/delete, pagination, first-login walkthrough on a new account, QR + copy link, mobile 390x844 with zero horizontal overflow on /reviews, /categories, /settings, /reviews/new and the public page). No blocking defect found.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/public/{slug}/use/{review_id}", "issue": "An unknown/non-existent review id now returns 409 'Someone just used this review' instead of 404 (the atomic find_one_and_update collapsed the two cases). Behaviour change vs iteration 6; harmless for the UI but wrong semantics for API consumers."},
+      {"endpoint": "POST /api/auth/login", "issue": "No brute-force protection: 7 consecutive wrong passwords all return 401 and the 8th correct attempt succeeds (no lockout/throttle, no attempt counter)."},
+      {"endpoint": "POST /api/auth/forgot-password", "issue": "No rate limit and previous unused tokens are not invalidated — every call inserts another password_resets row for the same user (11 rows accumulated during testing). Consider throttling + invalidating older tokens and adding a TTL index on expires_at."},
+      {"endpoint": "POST /api/auth/reset-password, /api/auth/change-password", "issue": "Existing sessions are not revoked after a password change/reset (old refresh_token stays valid for 7 days)."},
+      {"endpoint": "backend/.env", "issue": "CORS_ORIGINS=\"*\" is set but unused (middleware hardcodes allow_origins=[FRONTEND_URL]) — dead config that can mislead the next dev."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Reviews list (filtered empty state)", "issues": ["When a filter matches no rows the heading correctly reads 'No reviews in \"X\"' but the sub-copy still says 'Tap ADD NEW, fill a short form, and we will write your reviews for you.' — slightly off for a filter-empty state (a 'Show all' hint would read better)."]},
+      {"screen": "Reviews list ('Show category' filter)", "issues": ["Filter options are derived from the loaded reviews only, so a freshly created category with zero reviews never appears in the dropdown; the owner cannot select it. Acceptable by design, but it makes the 'No reviews in \"X\"' state reachable only after deleting the last row of a category."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/backend_test.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Optional: return 404 (not 409) from /api/public/{slug}/use/{id} when the review id does not exist at all.",
+    "Optional hardening: login lockout/throttle after ~5 failed attempts, rate-limit forgot-password, invalidate older reset tokens, and revoke refresh tokens after password change/reset.",
+    "Optional copy tweak: filter-empty sub-text on the Reviews page.",
+    "Remove the unused CORS_ORIGINS key from backend/.env or actually use it."
+  ],
+  "critical_code_review_comments": [
+    "GET /api/public/{slug} correctly filters status='available' and returns 'available' — no fallback to used rows; POST use/{id} is a single atomic find_one_and_update so the double-post race is safe (verified: 200 + 409, use_count stays 1).",
+    "Password reset stores only sha256(token) with a 1h expiry and a used flag; verified reuse/expired/unknown all rejected with 400. Add a TTL index on password_resets.expires_at to stop unbounded growth.",
+    "server.py is 512 lines with 25+ endpoints in one module — still under the 700-line limit but close; consider splitting auth/reviews/public routers before the next feature batch."
+  ],
+  "updated_files": ["/app/backend/tests/backend_test.py"],
+  "success_rate": {"backend": "100% (81/81 pytest)", "frontend": "100% of tested flows (0 failures across 6 Playwright runs)"},
+  "seed_data_creation": "Temporary: seeded reviews/categories directly in Mongo for the demo owner and for throwaway test_qa_* accounts, plus password_resets rows. ALL cleaned up afterwards (all test_qa_* users, businesses, categories, reviews and QA categories deleted). Demo owner left healthy: password ReviewBoost123! (verified login 200, hash $2b$), 21 reviews with 9 available on slug PCiXONhzO_7mFA (10 freshly LLM-generated in category 'cleaning'), categories: General, cleaning.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "owner@reviewboost.demo / ReviewBoost123! (restored and verified at end of run)",
+  "context_for_next_testing_agent": "backend_test.py now has iteration-7 classes: TestPublicAvailableOnly, TestGoogleAuth, TestPasswordReset, plus helpers seed_reviews()/mdb (direct pymongo, setup only). TestBulkDelete was moved onto its own fresh account because it used to delete the demo owner's newest reviews and raced TestReviews under xdist -n 2. Real Google OAuth completion is untestable (only the redirect target + invalid session_id path were verified). Frontend clipboard reads on the public page fail after the outbound g.page navigation is aborted — assert on the toast/list instead. Demo owner currently has 9 available reviews; re-seed before public-page tests that consume them.",
+  "rca_of_the_issue": "No product defect reproduced. Two pre-existing test-suite issues were fixed instead: (1) obsolete assertions that allowed used reviews to reappear on the public page, (2) a cross-worker race where TestBulkDelete deleted the reviews TestReviews had just generated on the shared demo account."
+}

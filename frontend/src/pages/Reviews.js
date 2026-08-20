@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Check, ChevronLeft, ChevronRight, Copy, MessageSquarePlus, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Copy, Filter, MessageSquarePlus, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, errText } from '../api';
 
@@ -14,6 +14,7 @@ export default function Reviews() {
   const [selected, setSelected] = useState([]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [category, setCategory] = useState('all');
 
   const load = async () => {
     try {
@@ -23,7 +24,9 @@ export default function Reviews() {
   };
   useEffect(() => { load(); }, []);
 
-  const reviews = data?.reviews || [];
+  const allReviews = data?.reviews || [];
+  const categories = [...new Set(allReviews.map((r) => r.category))];
+  const reviews = category === 'all' ? allReviews : allReviews.filter((r) => r.category === category);
   const pageCount = Math.max(1, Math.ceil(reviews.length / pageSize));
   const current = useMemo(() => reviews.slice((page - 1) * pageSize, page * pageSize), [reviews, page, pageSize]);
   useEffect(() => { if (page > pageCount) setPage(1); }, [pageCount, page]);
@@ -114,6 +117,15 @@ export default function Reviews() {
         <div className="stat"><b data-testid="stat-used">{data?.used ?? 0}</b><span>Used by customers</span></div>
       </div>
 
+      <div className="filter-row">
+        <label className="filter-label"><Filter size={16} /> Show category</label>
+        <select value={category} onChange={(e) => { setCategory(e.target.value); setPage(1); setSelected([]); }} data-testid="category-filter-select">
+          <option value="all">All categories ({allReviews.length})</option>
+          {categories.map((c) => <option key={c} value={c}>{c} ({allReviews.filter((r) => r.category === c).length})</option>)}
+        </select>
+        {category !== 'all' && <button className="text-btn" onClick={() => { setCategory('all'); setPage(1); }} data-testid="clear-filter-button">Show all</button>}
+      </div>
+
       {selected.length > 0 && (
         <div className="bulk-bar" data-testid="bulk-bar">
           <strong data-testid="bulk-count">{selected.length} selected</strong>
@@ -185,8 +197,8 @@ export default function Reviews() {
         ) : (
           <div className="empty" data-testid="reviews-empty">
             <MessageSquarePlus size={30} />
-            <strong>No reviews yet</strong>
-            <span>Tap ADD NEW, fill a short form, and we will write your reviews for you.</span>
+            <strong>{category === 'all' ? 'No reviews yet' : `No reviews in "${category}"`}</strong>
+            <span>{category === 'all' ? 'Tap ADD NEW, fill a short form, and we will write your reviews for you.' : 'Nothing in this group yet. Tap "Show all" above, or add new reviews for this group.'}</span>
             <div style={{ marginTop: 18 }}><Link className="btn btn-primary" to="/reviews/new"><Plus size={18} /> ADD NEW</Link></div>
           </div>
         )}

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Sparkles } from 'lucide-react';
+import { ArrowLeft, Plus, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, errText } from '../api';
+import { CategoryModal } from '../components/CategoryModal';
 
 const TONES = ['Mixed (recommended)', 'Friendly', 'Storytelling', 'Short & Direct', 'Natural', 'Detailed'];
 const STYLES = ['Simple', 'Detailed', 'Story'];
@@ -12,6 +13,7 @@ const COUNTS = [10, 15, 25, 40, 50];
 export default function AddReview() {
   const nav = useNavigate();
   const [categories, setCategories] = useState([]);
+  const [showModal, setShowModal] = useState(false);
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({
     category: '', business_name: '', business_category: '', keywords: '', usp: '', location: '',
@@ -56,6 +58,9 @@ export default function AddReview() {
 
   return (
     <>
+      {showModal && (
+        <CategoryModal onClose={() => setShowModal(false)} onCreated={(c) => { setCategories((cs) => [c, ...cs]); setForm((f) => ({ ...f, category: c.name })); toast.success('Category added'); }} />
+      )}
       <div className="page-head">
         <div>
           <Link to="/reviews" className="text-btn back-link" data-testid="back-to-reviews"><ArrowLeft size={16} /> Back</Link>
@@ -67,9 +72,14 @@ export default function AddReview() {
       <form className="form-card" onSubmit={submit}>
         <div className="form-grid">
           <div className="field">
-            <label>Review Category <span className="req">*</span><span className="hint">Group reviews, e.g. haircut, delivery</span></label>
-            <input list="category-list" required value={form.category} onChange={set('category')} placeholder="Type or pick a group" data-testid="category-input" />
-            <datalist id="category-list">{categories.map((c) => <option key={c.id} value={c.name} />)}</datalist>
+            <label>Review Category <span className="req">*</span><span className="hint">Pick a group for these reviews</span></label>
+            <div className="pick-row">
+              <select required value={form.category} onChange={set('category')} data-testid="category-select">
+                <option value="" disabled>Select a category</option>
+                {categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
+              </select>
+              <button type="button" className="btn btn-ghost" onClick={() => setShowModal(true)} data-testid="add-category-inline-button"><Plus size={16} /> New</button>
+            </div>
           </div>
           <div className="field">
             <label>Business Name <span className="req">*</span></label>

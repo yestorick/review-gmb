@@ -18,8 +18,13 @@ export default function PublicReview() {
     let result;
     try {
       result = (await api.post(`/public/${slug}/use/${id}`)).data;
-    } catch {
-      toast.error('Please tap again to copy your review');
+    } catch (x) {
+      if (x?.response?.status === 409) {
+        toast.error('Someone just used that one. Pick another review.');
+        api.get(`/public/${slug}`).then((r) => setData(r.data)).catch(() => {});
+      } else {
+        toast.error('Please tap again to copy your review');
+      }
       setBusy(false);
       return;
     }
@@ -47,14 +52,21 @@ export default function PublicReview() {
           </div>
         </div>
         <p className="sub">Tap the one that feels like your visit. We copy it for you.</p>
-        <div className="review-cards">
-          {data.drafts.map((d, i) => (
-            <button className="review-card" key={d.id} disabled={busy} onClick={() => choose(d.id)} data-testid={`public-draft-${i}`}>
-              <span>{d.text}</span>
-              <ArrowRight size={18} />
-            </button>
-          ))}
-        </div>
+        {data.drafts.length === 0 ? (
+          <div className="center-box" data-testid="public-empty">
+            <strong style={{ fontSize: '1.05rem' }}>All reviews are taken right now</strong>
+            <p style={{ color: 'var(--body)' }}>Every ready-made review here has already been used. Please check back a little later — fresh ones are on the way.</p>
+          </div>
+        ) : (
+          <div className="review-cards">
+            {data.drafts.map((d, i) => (
+              <button className="review-card" key={d.id} disabled={busy} onClick={() => choose(d.id)} data-testid={`public-draft-${i}`}>
+                <span>{d.text}</span>
+                <ArrowRight size={18} />
+              </button>
+            ))}
+          </div>
+        )}
         <p className="public-foot">After tapping, paste it on Google and hit post. Takes 5 seconds.</p>
       </div>
     </div>

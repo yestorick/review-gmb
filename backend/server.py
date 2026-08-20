@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 load_dotenv()
 
-import asyncio, base64, io, json, logging, os, re, secrets, uuid
+import asyncio, base64, hashlib, io, json, logging, os, re, secrets, uuid
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 from urllib.parse import urlsplit, urlunsplit
@@ -9,6 +9,8 @@ from urllib.parse import urlsplit, urlunsplit
 import bcrypt
 import jwt
 import qrcode
+import requests
+import resend
 from bson import ObjectId
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -160,6 +162,91 @@ class BulkIn(BaseModel):
     ids: list[str] = Field(min_length=1, max_length=500)
 
 
+class SessionIn(BaseModel):
+    session_id: str = Field(min_length=8, max_length=500)
+
+
+class EmailIn(BaseModel):
+    email: EmailStr
+
+
+class ResetIn(BaseModel):
+    token: str = Field(min_length=10, max_length=200)
+    password: str = Field(min_length=8)
+
+
+def send_reset_email(email: str, token: str) -> bool:
+    api_key = os.environ.get('RESEND_API_KEY')
+    if not api_key:
+        logging.warning('RESEND_API_KEY missing, password reset email not sent')
+        return False
+    resend.api_key = api_key
+    link = f'{FRONTEND_URL}/reset-password?token={token}'
+    html = f"""<div style="font-family:Arial,Helvetica,sans-serif;color:#14243a">
+      <h2 style="color:#1d7cf5">Reset your ReviewBoost password</h2>
+      <p>Tap the button below to choose a new password. This link works for one hour.</p>
+      <p><a href="{link}" style="background:#1d7cf5;color:#fff;padding:12px 22px;border-radius:8px;text-decoration:none;display:inline-block">Choose a new password</a></p>
+      <p style="font-size:13px;color:#4b5b6f">If you did not ask for this, you can ignore this email.</p>
+    </div>"""
+    resend.Emails.send({'from': os.environ.get('SENDER_EMAIL', 'onboarding@resend.dev'), 'to': [email],
+                        'subject': 'Reset your ReviewBoost password', 'html': html})
+    return True
+
+
+@api.post('/auth/google/session')
+async def google_session(body: SessionIn, response: Response):
+    r = await asyncio.to_thread(requests.get, 'https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data',
+                                headers={'X-Session-ID': body.session_id}, timeout=30)
+    if r.status_code != 200:
+        raise HTTPException(401, 'Google sign-in did not work. Please try again.')
+    data = r.json()
+    email = (data.get('email') or '').lower()
+    if not email:
+        raise HTTPException(401, 'Google did not share an email address for this account')
+    user = await db.users.find_one({'email': email})
+    if user:
+        await db.users.update_one({'_id': user['_id']}, {'$set': {'name': data.get('name') or user.get('name', ''), 'picture': data.get('picture', '')}})
+    else:
+        doc = {'email': email, 'name': data.get('name', ''), 'picture': data.get('picture', ''), 'auth_provider': 'google', 'created_at': now()}
+        doc['_id'] = (await db.users.insert_one(doc)).inserted_id
+        user = doc
+    await owner_business(user, create=True)
+    set_auth(response, user)
+    return public_user(user)
+
+
+@api.post('/auth/forgot-password')
+async def forgot_password(body: EmailIn):
+    u = await db.users.find_one({'email': body.email.lower()})
+    sent = False
+    if u and u.get('password_hash'):
+        token = secrets.token_urlsafe(32)
+        await db.password_resets.update_many({'user_id': str(u['_id']), 'used': False}, {'$set': {'used': True}})
+        await db.password_resets.insert_one({
+            'token_hash': hashlib.sha256(token.encode()).hexdigest(), 'user_id': str(u['_id']),
+            'expires_at': (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat(), 'used': False, 'created_at': now()})
+        try:
+            sent = await asyncio.to_thread(send_reset_email, u['email'], token)
+        except Exception as e:
+            logging.error('Reset email failed: %s', e)
+    return {'ok': True, 'email_sent': sent,
+            'message': 'If that email has an account, we have sent a reset link. Check your inbox and spam folder.'}
+
+
+@api.post('/auth/reset-password')
+async def reset_password(body: ResetIn, response: Response):
+    doc = await db.password_resets.find_one({'token_hash': hashlib.sha256(body.token.encode()).hexdigest(), 'used': False})
+    if not doc or datetime.fromisoformat(doc['expires_at']) < datetime.now(timezone.utc):
+        raise HTTPException(400, 'This reset link has expired. Please ask for a new one.')
+    u = await db.users.find_one({'_id': ObjectId(doc['user_id'])})
+    if not u:
+        raise HTTPException(400, 'This reset link is no longer valid')
+    await db.users.update_one({'_id': u['_id']}, {'$set': {'password_hash': hash_password(body.password)}})
+    await db.password_resets.update_one({'_id': doc['_id']}, {'$set': {'used': True}})
+    set_auth(response, u)
+    return public_user(u)
+
+
 @api.post('/auth/register')
 async def register(body: Credentials, response: Response):
     email = body.email.lower()
@@ -175,9 +262,17 @@ async def register(body: Credentials, response: Response):
 
 @api.post('/auth/login')
 async def login(body: Credentials, response: Response):
-    u = await db.users.find_one({'email': body.email.lower()})
+    email = body.email.lower()
+    attempt = await db.login_attempts.find_one({'email': email})
+    if attempt and attempt['count'] >= 8 and datetime.fromisoformat(attempt['last_at']) > datetime.now(timezone.utc) - timedelta(minutes=15):
+        raise HTTPException(429, 'Too many wrong tries. Please wait 15 minutes or use "Forgot password?".')
+    u = await db.users.find_one({'email': email})
+    if u and not u.get('password_hash'):
+        raise HTTPException(401, 'This email is signed up with Google. Please tap "Continue with Google".')
     if not u or not check_password(body.password, u['password_hash']):
+        await db.login_attempts.update_one({'email': email}, {'$inc': {'count': 1}, '$set': {'last_at': now()}}, upsert=True)
         raise HTTPException(401, 'Email or password is incorrect')
+    await db.login_attempts.delete_one({'email': email})
     await owner_business(u, create=True)
     set_auth(response, u)
     return public_user(u)
@@ -197,6 +292,8 @@ async def logout(response: Response):
 
 @api.post('/auth/change-password')
 async def change_password(body: PasswordChange, u=Depends(current_user)):
+    if not u.get('password_hash'):
+        raise HTTPException(400, 'Your account signs in with Google, so there is no password to change.')
     if not check_password(body.current_password, u['password_hash']):
         raise HTTPException(401, 'Your current password is incorrect')
     await db.users.update_one({'_id': u['_id']}, {'$set': {'password_hash': hash_password(body.new_password)}})
@@ -374,30 +471,27 @@ async def regenerate_review(review_id: str, u=Depends(current_user)):
 
 
 @api.get('/public/{slug}')
-async def public_page(slug: str, request: Request):
+async def public_page(slug: str):
     b = await db.businesses.find_one({'public_slug': slug})
     if not b or not b.get('google_review_url'):
         raise HTTPException(404, 'Review link not found')
-    rows = await db.reviews.find({'business_id': b['id']}, {'_id': 0, 'user_id': 0, 'params': 0}).sort([('status', 1), ('last_used_at', 1), ('created_at', 1)]).to_list(2000)
-    session = request.cookies.get('review_session')
-    used = set(session.split(',')) if session else set()
-    visible = [r for r in rows if r['id'] not in used] or rows
+    rows = await db.reviews.find({'business_id': b['id'], 'status': 'available'}, {'_id': 0, 'user_id': 0, 'params': 0}).sort('created_at', 1).to_list(2000)
     return {'business': {'name': b.get('name', ''), 'category': b.get('business_category', ''), 'location': b.get('location', '')},
-            'drafts': visible[:6]}
+            'drafts': rows[:6], 'available': len(rows)}
 
 
 @api.post('/public/{slug}/use/{review_id}')
-async def use_review(slug: str, review_id: str, response: Response, request: Request):
+async def use_review(slug: str, review_id: str):
     b = await db.businesses.find_one({'public_slug': slug})
     if not b or not b.get('google_review_url'):
         raise HTTPException(404, 'Review link not found')
-    d = await db.reviews.find_one({'id': review_id, 'business_id': b['id']})
+    d = await db.reviews.find_one_and_update({'id': review_id, 'business_id': b['id'], 'status': 'available'},
+                                             {'$set': {'status': 'used', 'last_used_at': now()}, '$inc': {'use_count': 1}})
     if not d:
-        raise HTTPException(404, 'Review not found')
-    await db.reviews.update_one({'id': review_id}, {'$set': {'status': 'used', 'last_used_at': now()}, '$inc': {'use_count': 1}})
+        if not await db.reviews.find_one({'id': review_id, 'business_id': b['id']}):
+            raise HTTPException(404, 'Review not found')
+        raise HTTPException(409, 'Someone just used this review. Please pick another one.')
     await db.businesses.update_one({'id': b['id']}, {'$inc': {'lifetime_used': 1}})
-    used = [x for x in request.cookies.get('review_session', '').split(',') if x]
-    response.set_cookie('review_session', ','.join((used + [review_id])[-8:]), max_age=86400, samesite='lax')
     return {'text': d['text'], 'google_url': b['google_review_url']}
 
 
@@ -420,6 +514,8 @@ async def startup():
     await db.users.create_index('email', unique=True)
     await db.businesses.create_index('public_slug', unique=True)
     await db.reviews.create_index('business_id')
+    await db.password_resets.create_index('token_hash')
+    await db.login_attempts.create_index('email', unique=True)
 
 
 @app.on_event('shutdown')

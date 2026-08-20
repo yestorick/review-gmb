@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { Menu } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import { api } from './api';
 import { Sidebar } from './components/Sidebar';
 import { Walkthrough } from './components/Walkthrough';
 import Auth from './pages/Auth';
+import AuthCallback from './pages/AuthCallback';
+import ResetPassword from './pages/ResetPassword';
 import Reviews from './pages/Reviews';
 import AddReview from './pages/AddReview';
 import Categories from './pages/Categories';
@@ -37,28 +39,41 @@ function Shell({ user, setUser, children }) {
   );
 }
 
-export default function App() {
+function Router() {
+  const location = useLocation();
   const [user, setUser] = useState(null);
   const [checking, setChecking] = useState(true);
+  const returningFromGoogle = location.hash?.includes('session_id=');
 
   useEffect(() => {
+    if (window.location.hash?.includes('session_id=')) { setChecking(false); return; }
     api.get('/auth/me').then((r) => setUser(r.data)).catch(() => setUser(false)).finally(() => setChecking(false));
   }, []);
 
-  const owner = (element) => (user ? <Shell user={user} setUser={setUser}>{element}</Shell> : <Navigate to="/" replace />);
+  if (returningFromGoogle) return <AuthCallback setUser={setUser} />;
+
+  const loading = <div className="loading-screen">ReviewBoost</div>;
+  const owner = (element) => (checking ? loading : user ? <Shell user={user} setUser={setUser}>{element}</Shell> : <Navigate to="/" replace />);
 
   return (
+    <Routes>
+      <Route path="/r/:slug" element={<PublicReview />} />
+      <Route path="/reset-password" element={<ResetPassword setUser={setUser} />} />
+      <Route path="/" element={checking ? loading : user ? <Navigate to="/reviews" replace /> : <Auth setUser={setUser} />} />
+      <Route path="/reviews" element={owner(<Reviews />)} />
+      <Route path="/reviews/new" element={owner(<AddReview />)} />
+      <Route path="/categories" element={owner(<Categories />)} />
+      <Route path="/settings" element={owner(<Settings />)} />
+      <Route path="/change-password" element={owner(<ChangePassword />)} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
+
+export default function App() {
+  return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/r/:slug" element={<PublicReview />} />
-        <Route path="/" element={checking ? <div className="loading-screen">ReviewBoost</div> : user ? <Navigate to="/reviews" replace /> : <Auth setUser={setUser} />} />
-        <Route path="/reviews" element={checking ? <div className="loading-screen">ReviewBoost</div> : owner(<Reviews />)} />
-        <Route path="/reviews/new" element={checking ? <div className="loading-screen">ReviewBoost</div> : owner(<AddReview />)} />
-        <Route path="/categories" element={checking ? <div className="loading-screen">ReviewBoost</div> : owner(<Categories />)} />
-        <Route path="/settings" element={checking ? <div className="loading-screen">ReviewBoost</div> : owner(<Settings />)} />
-        <Route path="/change-password" element={checking ? <div className="loading-screen">ReviewBoost</div> : owner(<ChangePassword />)} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <Router />
       <Toaster position="bottom-right" />
     </BrowserRouter>
   );

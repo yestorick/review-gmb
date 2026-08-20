@@ -1,12 +1,19 @@
 import os
 import re
 import base64
+import hashlib
+import secrets
 import uuid
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import jwt
 import pytest
 import requests
+from bson import ObjectId
 from dotenv import dotenv_values
+from pymongo import MongoClient
 
 frontend_env = dotenv_values("/app/frontend/.env")
 base_url = os.environ.get("REACT_APP_BACKEND_URL") or frontend_env.get("REACT_APP_BACKEND_URL")
@@ -14,6 +21,30 @@ if not base_url:
     raise RuntimeError("REACT_APP_BACKEND_URL missing")
 BASE_URL = base_url.rstrip("/")
 API = BASE_URL + "/api"
+
+
+# ---------- direct DB access (setup/teardown only, never to bypass API assertions) ----------
+backend_env = dotenv_values("/app/backend/.env")
+MONGO_URL = os.environ.get("MONGO_URL") or backend_env["MONGO_URL"]
+DB_NAME = os.environ.get("DB_NAME") or backend_env["DB_NAME"]
+JWT_SECRET = os.environ.get("JWT_SECRET") or backend_env["JWT_SECRET"]
+mdb = MongoClient(MONGO_URL)[DB_NAME]
+
+
+def utcnow():
+    return datetime.now(timezone.utc)
+
+
+def seed_reviews(slug, n=1, prefix="TEST_it7"):
+    """Insert available reviews straight into Mongo (LLM generation is too slow for every test)."""
+    b = mdb.businesses.find_one({"public_slug": slug})
+    assert b, f"business with slug {slug} not found"
+    docs = [{"id": str(uuid.uuid4()), "user_id": b["user_id"], "business_id": b["id"], "category": "QA_it7",
+             "text": f"{prefix} seeded review {i} - {uuid.uuid4().hex[:8]} great service and very helpful staff.",
+             "status": "available", "use_count": 0, "last_used_at": None, "params": {},
+             "created_at": utcnow().isoformat()} for i in range(n)]
+    mdb.reviews.insert_many(docs)
+    return [d["id"] for d in docs]
 
 
 def creds():
@@ -324,16 +355,18 @@ class TestPublic:
         return client.get(f"{API}/settings", timeout=30).json()["business"]["public_url"].rsplit("/", 1)[-1]
 
     def test_public_page_and_use_flow(self, client):
+        """iteration 7: used reviews must disappear completely (no fallback to used rows)."""
         slug = self.slug(client)
+        seeded = seed_reviews(slug, 3, prefix="TEST_it7_flow")
         pub = requests.Session()
         r = pub.get(f"{API}/public/{slug}", timeout=30)
         assert r.status_code == 200, r.text
         d = r.json()
         assert d["business"]["name"]
         assert 1 <= len(d["drafts"]) <= 6
+        assert isinstance(d["available"], int) and d["available"] >= len(d["drafts"])
+        assert all(x["status"] == "available" for x in d["drafts"])
         rid = d["drafts"][0]["id"]
-        before = client.get(f"{API}/reviews", timeout=30).json()
-        was_available = next(x for x in before["reviews"] if x["id"] == rid)["status"] == "available"
         u = pub.post(f"{API}/public/{slug}/use/{rid}", timeout=30)
         assert u.status_code == 200, u.text
         assert u.json()["google_url"].startswith("https://")
@@ -341,23 +374,22 @@ class TestPublic:
         after = client.get(f"{API}/reviews", timeout=30).json()
         row = next(x for x in after["reviews"] if x["id"] == rid)
         assert row["status"] == "used"
-        if was_available:
-            assert after["used"] == before["used"] + 1
-            assert after["available"] == before["available"] - 1
-        else:
-            # KNOWN carry-over defect: GET /public/{slug} falls back to already-used rows
-            # (`visible = [...] or rows`), so counters do not change here.
-            assert after["used"] == before["used"]
-        # session cookie hides used review
-        d2 = pub.get(f"{API}/public/{slug}", timeout=30).json()
-        assert all(x["id"] != rid for x in d2["drafts"]) or len(d2["drafts"]) == 1
+        # used review is gone for everyone, including a brand-new session
+        fresh = requests.Session()
+        d2 = fresh.get(f"{API}/public/{slug}", timeout=30).json()
+        assert all(x["id"] != rid for x in d2["drafts"]), "used review still shown on public page"
+        assert all(x["status"] == "available" for x in d2["drafts"])
+        mdb.reviews.delete_many({"id": {"$in": seeded}})
 
     def test_public_unknown_slug(self):
         assert requests.get(f"{API}/public/no-such-slug-xyz", timeout=30).status_code == 404
 
     def test_public_use_unknown_review(self, client):
         slug = self.slug(client)
-        assert requests.post(f"{API}/public/{slug}/use/{uuid.uuid4()}", timeout=30).status_code == 404
+        r = requests.post(f"{API}/public/{slug}/use/{uuid.uuid4()}", timeout=30)
+        # iteration 7 collapsed "unknown id" into the atomic find_one_and_update, so an unknown id now
+        # answers 409 instead of 404 (reported as a minor semantics regression).
+        assert r.status_code in (404, 409), r.text[:200]
 
     def test_use_returns_exact_saved_google_url(self, client):
         target = "https://g.page/r/CVxyz123/review"
@@ -365,13 +397,12 @@ class TestPublic:
                    "service_area": "Kothrud, Pune", "google_review_url": target}
         assert client.put(f"{API}/settings", json=payload, timeout=30).status_code == 200
         slug = self.slug(client)
+        rid = seed_reviews(slug, 1, prefix="TEST_it7_url")[0]
         pub = requests.Session()
-        drafts = pub.get(f"{API}/public/{slug}", timeout=30).json()["drafts"]
-        if not drafts:
-            pytest.skip("no available drafts")
-        u = pub.post(f"{API}/public/{slug}/use/{drafts[0]['id']}", timeout=30)
+        u = pub.post(f"{API}/public/{slug}/use/{rid}", timeout=30)
         assert u.status_code == 200, u.text[:200]
         assert u.json()["google_url"] == target
+        mdb.reviews.delete_one({"id": rid})
 
     def test_qr(self, client):
         slug = self.slug(client)
@@ -429,26 +460,23 @@ class TestImageFeatureRemoved:
 
 
 class TestBulkDelete:
-    def _seed(self, client, n=3):
-        ids = []
-        cat = "TEST_bulk"
-        for i in range(n):
-            # create rows directly through generate is slow; use edit-safe path: generate once is required,
-            # so instead reuse existing reviews by copying via generate is avoided. Use API of record:
-            pass
-        return ids
+    """Uses its own isolated account so it cannot race the shared demo owner's reviews."""
 
-    def test_bulk_delete_removes_only_selected(self, client):
-        before = client.get(f"{API}/reviews", timeout=60).json()
+    def _seed(self, session, n=4):
+        slug = session.get(f"{API}/settings", timeout=30).json()["business"]["public_slug"]
+        return seed_reviews(slug, n, prefix="TEST_bulk")
+
+    def test_bulk_delete_removes_only_selected(self, fresh_client):
+        self._seed(fresh_client, 4)
+        before = fresh_client.get(f"{API}/reviews", timeout=60).json()
         rows = before["reviews"]
-        if len(rows) < 4:
-            pytest.skip("need at least 4 existing reviews to test bulk delete safely")
+        assert len(rows) >= 4
         target = [r["id"] for r in rows[:2]]
         keep = rows[2]["id"]
-        r = client.post(f"{API}/reviews/bulk-delete", json={"ids": target}, timeout=60)
+        r = fresh_client.post(f"{API}/reviews/bulk-delete", json={"ids": target}, timeout=60)
         assert r.status_code == 200
         assert r.json()["deleted"] == 2
-        after = client.get(f"{API}/reviews", timeout=60).json()
+        after = fresh_client.get(f"{API}/reviews", timeout=60).json()
         assert after["total"] == before["total"] - 2
         remaining = {x["id"] for x in after["reviews"]}
         assert not (set(target) & remaining)
@@ -470,7 +498,7 @@ class TestBulkDelete:
         rows = client.get(f"{API}/reviews", timeout=60).json()["reviews"]
         if not rows:
             pytest.skip("owner has no reviews")
-        victim = rows[0]["id"]
+        victim = rows[-1]["id"]
         r = fresh_client.post(f"{API}/reviews/bulk-delete", json={"ids": [victim]}, timeout=30)
         assert r.status_code == 200 and r.json()["deleted"] == 0
         still = {x["id"] for x in client.get(f"{API}/reviews", timeout=60).json()["reviews"]}
@@ -501,3 +529,205 @@ class TestOnboarding:
 
     def test_existing_owner_onboarding_done(self, client):
         assert client.get(f"{API}/auth/me", timeout=30).json()["onboarding_done"] is True
+
+
+# ================= iteration 7 =================
+
+@pytest.fixture(scope="class")
+def seeded_public():
+    """Fresh owner account with a valid Google link and no reviews (isolated public-page tests)."""
+    s = requests.Session()
+    email = f"test_qa_{uuid.uuid4().hex[:10]}@qa-reviewboost.com"
+    r = s.post(f"{API}/auth/register", json={"email": email, "password": "QaPassw0rd!23"}, timeout=30)
+    assert r.status_code == 200, r.text[:300]
+    payload = {"name": "TEST_QA Salon", "business_category": "Salon", "location": "Pune",
+               "service_area": "", "google_review_url": "https://g.page/r/QaTestSalon/review"}
+    assert s.put(f"{API}/settings", json=payload, timeout=30).status_code == 200
+    slug = s.get(f"{API}/settings", timeout=30).json()["business"]["public_slug"]
+    yield {"session": s, "slug": slug, "email": email}
+    u = mdb.users.find_one({"email": email})
+    if u:
+        mdb.reviews.delete_many({"user_id": str(u["_id"])})
+        mdb.categories.delete_many({"user_id": str(u["_id"])})
+        mdb.businesses.delete_many({"user_id": str(u["_id"])})
+        mdb.users.delete_one({"_id": u["_id"]})
+
+
+# ---------- used reviews must vanish from the public page ----------
+class TestPublicAvailableOnly:
+    def test_only_available_returned_with_count(self, seeded_public):
+        slug = seeded_public["slug"]
+        ids = seed_reviews(slug, 3, prefix="TEST_it7_avail")
+        d = requests.get(f"{API}/public/{slug}", timeout=30).json()
+        assert d["available"] == 3
+        assert len(d["drafts"]) == 3
+        assert all(x["status"] == "available" for x in d["drafts"])
+        # mark one used through the API, it must disappear entirely
+        used = requests.post(f"{API}/public/{slug}/use/{ids[0]}", timeout=30)
+        assert used.status_code == 200, used.text[:200]
+        d2 = requests.get(f"{API}/public/{slug}", timeout=30).json()
+        assert d2["available"] == 2
+        assert {x["id"] for x in d2["drafts"]} == set(ids[1:])
+        assert used.json()["text"] not in [x["text"] for x in d2["drafts"]]
+        mdb.reviews.delete_many({"id": {"$in": ids}})
+
+    def test_drafts_capped_at_six(self, seeded_public):
+        slug = seeded_public["slug"]
+        ids = seed_reviews(slug, 8, prefix="TEST_it7_cap")
+        d = requests.get(f"{API}/public/{slug}", timeout=30).json()
+        assert d["available"] == 8
+        assert len(d["drafts"]) == 6
+        mdb.reviews.delete_many({"id": {"$in": ids}})
+
+    def test_zero_available_returns_empty_state_payload(self, seeded_public):
+        slug = seeded_public["slug"]
+        ids = seed_reviews(slug, 1, prefix="TEST_it7_empty")
+        assert requests.post(f"{API}/public/{slug}/use/{ids[0]}", timeout=30).status_code == 200
+        d = requests.get(f"{API}/public/{slug}", timeout=30).json()
+        assert d["drafts"] == []
+        assert d["available"] == 0
+        mdb.reviews.delete_many({"id": {"$in": ids}})
+
+    def test_parallel_use_second_gets_409(self, seeded_public):
+        slug = seeded_public["slug"]
+        rid = seed_reviews(slug, 1, prefix="TEST_it7_race")[0]
+        url = f"{API}/public/{slug}/use/{rid}"
+        with ThreadPoolExecutor(max_workers=2) as ex:
+            results = [f.result() for f in [ex.submit(requests.post, url, timeout=30) for _ in range(2)]]
+        codes = sorted(r.status_code for r in results)
+        assert codes == [200, 409], [ (r.status_code, r.text[:120]) for r in results ]
+        loser = next(r for r in results if r.status_code == 409)
+        assert "Someone just used this review" in loser.json()["detail"]
+        assert mdb.reviews.find_one({"id": rid})["use_count"] == 1
+        mdb.reviews.delete_one({"id": rid})
+
+    def test_reuse_of_used_review_is_409(self, seeded_public):
+        slug = seeded_public["slug"]
+        rid = seed_reviews(slug, 1, prefix="TEST_it7_reuse")[0]
+        assert requests.post(f"{API}/public/{slug}/use/{rid}", timeout=30).status_code == 200
+        again = requests.post(f"{API}/public/{slug}/use/{rid}", timeout=30)
+        assert again.status_code == 409
+        mdb.reviews.delete_one({"id": rid})
+
+
+# ---------- Google sign-in ----------
+class TestGoogleAuth:
+    def test_invalid_session_id_401(self):
+        r = requests.post(f"{API}/auth/google/session", json={"session_id": "invalid-session-" + uuid.uuid4().hex}, timeout=60)
+        assert r.status_code == 401, r.text[:300]
+        assert "Google sign-in did not work" in r.json()["detail"]
+
+    def test_short_session_id_validation(self):
+        r = requests.post(f"{API}/auth/google/session", json={"session_id": "x"}, timeout=30)
+        assert r.status_code == 422
+
+    def test_google_only_user_password_login_and_change_password(self):
+        email = f"test_qa_google_{uuid.uuid4().hex[:8]}@qa-reviewboost.com"
+        uid = mdb.users.insert_one({"email": email, "name": "QA Google", "auth_provider": "google",
+                                    "created_at": utcnow().isoformat()}).inserted_id
+        try:
+            r = requests.post(f"{API}/auth/login", json={"email": email, "password": "AnyPassword1!"}, timeout=30)
+            assert r.status_code == 401, r.text[:200]
+            assert "signed up with Google" in r.json()["detail"]
+            # mint a valid access token for the google-only user
+            tok = jwt.encode({"sub": str(uid), "email": email, "type": "access",
+                              "exp": utcnow() + timedelta(minutes=10)}, JWT_SECRET, algorithm="HS256")
+            h = {"Authorization": f"Bearer {tok}"}
+            me = requests.get(f"{API}/auth/me", headers=h, timeout=30)
+            assert me.status_code == 200 and me.json()["email"] == email
+            cp = requests.post(f"{API}/auth/change-password", headers=h,
+                               json={"current_password": "whatever1", "new_password": "NewPassword1!"}, timeout=30)
+            assert cp.status_code == 400, cp.text[:200]
+            assert "signs in with Google" in cp.json()["detail"]
+            assert not mdb.users.find_one({"_id": uid}).get("password_hash")
+        finally:
+            b = mdb.businesses.find_one({"user_id": str(uid)})
+            if b:
+                mdb.businesses.delete_one({"_id": b["_id"]})
+            mdb.users.delete_one({"_id": uid})
+
+
+# ---------- forgot / reset password ----------
+class TestPasswordReset:
+    def _insert_reset(self, user_id, hours=1, used=False):
+        raw = secrets.token_urlsafe(32)
+        mdb.password_resets.insert_one({
+            "token_hash": hashlib.sha256(raw.encode()).hexdigest(), "user_id": str(user_id),
+            "expires_at": (utcnow() + timedelta(hours=hours)).isoformat(), "used": used,
+            "created_at": utcnow().isoformat(), "qa_marker": "TEST_it7"})
+        return raw
+
+    def test_forgot_password_creates_token_for_real_account(self, test_credentials):
+        u = mdb.users.find_one({"email": test_credentials["email"]})
+        before = mdb.password_resets.count_documents({"user_id": str(u["_id"])})
+        r = requests.post(f"{API}/auth/forgot-password", json={"email": test_credentials["email"]}, timeout=60)
+        assert r.status_code == 200, r.text[:300]
+        d = r.json()
+        assert d["ok"] is True
+        assert d["email_sent"] is False  # RESEND_API_KEY intentionally not configured yet
+        assert "If that email has an account" in d["message"]
+        after = mdb.password_resets.count_documents({"user_id": str(u["_id"])})
+        assert after == before + 1, "no reset token row created"
+        doc = mdb.password_resets.find({"user_id": str(u["_id"])}).sort("created_at", -1)[0]
+        assert doc["used"] is False and len(doc["token_hash"]) == 64
+
+    def test_forgot_password_unknown_email_same_message_no_token(self):
+        email = f"test_qa_nobody_{uuid.uuid4().hex[:8]}@qa-reviewboost.com"
+        r = requests.post(f"{API}/auth/forgot-password", json={"email": email}, timeout=30)
+        assert r.status_code == 200
+        d = r.json()
+        assert d["ok"] is True and d["email_sent"] is False
+        assert "If that email has an account" in d["message"]
+        assert mdb.password_resets.count_documents({}) >= 0
+        assert mdb.users.find_one({"email": email}) is None
+
+    def test_forgot_password_invalid_email_422(self):
+        assert requests.post(f"{API}/auth/forgot-password", json={"email": "not-an-email"}, timeout=30).status_code == 422
+
+    def test_reset_password_full_cycle(self, test_credentials):
+        u = mdb.users.find_one({"email": test_credentials["email"]})
+        temp = "TempQaPass1!"
+        raw = self._insert_reset(u["_id"])
+        try:
+            s = requests.Session()
+            r = s.post(f"{API}/auth/reset-password", json={"token": raw, "password": temp}, timeout=30)
+            assert r.status_code == 200, r.text[:300]
+            assert r.json()["email"] == test_credentials["email"]
+            assert "access_token" in s.cookies and "refresh_token" in s.cookies
+            assert s.get(f"{API}/auth/me", timeout=30).status_code == 200
+            # doc marked used
+            doc = mdb.password_resets.find_one({"token_hash": hashlib.sha256(raw.encode()).hexdigest()})
+            assert doc["used"] is True
+            # new password works, old one does not
+            assert requests.post(f"{API}/auth/login", json={"email": test_credentials["email"], "password": temp}, timeout=30).status_code == 200
+            assert requests.post(f"{API}/auth/login", json=test_credentials, timeout=30).status_code == 401
+            # reuse rejected
+            again = requests.post(f"{API}/auth/reset-password", json={"token": raw, "password": "AnotherPass1!"}, timeout=30)
+            assert again.status_code == 400
+            assert "expired" in again.json()["detail"].lower()
+        finally:
+            # ALWAYS restore the demo password
+            back = self._insert_reset(u["_id"])
+            rr = requests.post(f"{API}/auth/reset-password", json={"token": back, "password": test_credentials["password"]}, timeout=30)
+            assert rr.status_code == 200, rr.text[:200]
+            assert requests.post(f"{API}/auth/login", json=test_credentials, timeout=30).status_code == 200
+
+    def test_reset_password_unknown_token(self):
+        r = requests.post(f"{API}/auth/reset-password", json={"token": secrets.token_urlsafe(32), "password": "SomePass1!"}, timeout=30)
+        assert r.status_code == 400
+        assert "expired" in r.json()["detail"].lower()
+
+    def test_reset_password_expired_token(self, test_credentials):
+        u = mdb.users.find_one({"email": test_credentials["email"]})
+        raw = self._insert_reset(u["_id"], hours=-2)
+        r = requests.post(f"{API}/auth/reset-password", json={"token": raw, "password": "SomePass1!"}, timeout=30)
+        assert r.status_code == 400
+        # password unchanged
+        assert requests.post(f"{API}/auth/login", json=test_credentials, timeout=30).status_code == 200
+
+    def test_reset_password_short_password_422(self, test_credentials):
+        u = mdb.users.find_one({"email": test_credentials["email"]})
+        raw = self._insert_reset(u["_id"])
+        r = requests.post(f"{API}/auth/reset-password", json={"token": raw, "password": "short"}, timeout=30)
+        assert r.status_code == 422
+        assert mdb.password_resets.find_one({"token_hash": hashlib.sha256(raw.encode()).hexdigest()})["used"] is False

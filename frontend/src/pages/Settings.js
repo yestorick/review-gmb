@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Check, Copy, Download } from 'lucide-react';
+import { Check, CheckCircle2, Copy, Download, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, errText } from '../api';
 
@@ -8,7 +8,9 @@ export default function Settings() {
   const [business, setBusiness] = useState(null);
   const [qr, setQr] = useState('');
   const [loaded, setLoaded] = useState(false);
-  const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+  const [editing, setEditing] = useState(false);
+  const [error, setError] = useState('');
+  const set = (k) => (e) => { setForm({ ...form, [k]: e.target.value }); setError(''); };
 
   const copyLink = async () => {
     try {
@@ -29,15 +31,18 @@ export default function Settings() {
       });
       setQr((await api.get(`/public/${b.public_slug}/qr`)).data.data_url);
       setLoaded(true);
+      setEditing(!b.name);
     })().catch((x) => toast.error(errText(x)));
   }, []);
 
   const save = async (e) => {
     e.preventDefault();
+    setError('');
     try {
       setBusiness((await api.put('/settings', form)).data);
+      setEditing(false);
       toast.success('Saved');
-    } catch (x) { toast.error(errText(x)); }
+    } catch (x) { setError(errText(x)); }
   };
 
   return (
@@ -45,7 +50,7 @@ export default function Settings() {
       <div className="page-head">
         <div>
           <h1 className="page-title" data-testid="settings-heading">My Business</h1>
-          <p className="page-help">Paste your Google review link once. Then your QR code and link start working.</p>
+          <p className="page-help">{editing ? 'Fill your details and paste your Google review link, then tap Save.' : 'Your details are saved. Tap Edit if you want to change anything.'}</p>
         </div>
       </div>
 
@@ -53,27 +58,35 @@ export default function Settings() {
         <div className="form-grid">
           <div className="field">
             <label>Business Name</label>
-            <input value={form.name} onChange={set('name')} placeholder="Sharma Dental Clinic" data-testid="settings-name-input" />
+            <input value={form.name} onChange={set('name')} disabled={!editing} placeholder="Sharma Dental Clinic" data-testid="settings-name-input" />
           </div>
           <div className="field">
             <label>Business Category</label>
-            <input value={form.business_category} onChange={set('business_category')} placeholder="Dentist" data-testid="settings-category-input" />
+            <input value={form.business_category} onChange={set('business_category')} disabled={!editing} placeholder="Dentist" data-testid="settings-category-input" />
           </div>
           <div className="field">
             <label>Location</label>
-            <input value={form.location} onChange={set('location')} placeholder="Kolkata" data-testid="settings-location-input" />
+            <input value={form.location} onChange={set('location')} disabled={!editing} placeholder="Kolkata" data-testid="settings-location-input" />
           </div>
           <div className="field">
             <label>Service Area<span className="hint">Optional</span></label>
-            <input value={form.service_area} onChange={set('service_area')} placeholder="Salt Lake, New Town" data-testid="settings-service-area-input" />
+            <input value={form.service_area} onChange={set('service_area')} disabled={!editing} placeholder="Salt Lake, New Town" data-testid="settings-service-area-input" />
           </div>
           <div className="field full">
             <label>Google Review Link<span className="hint">Open your Google listing, tap Reviews, then "Get more reviews" and copy that link</span></label>
-            <input value={form.google_review_url} onChange={set('google_review_url')} placeholder="https://g.page/your-shop/review" data-testid="settings-google-url-input" />
+            <input value={form.google_review_url} onChange={set('google_review_url')} disabled={!editing} placeholder="https://g.page/your-shop/review" data-testid="settings-google-url-input" />
           </div>
         </div>
+        {error && <div className="inline-error" data-testid="settings-error">{error}</div>}
         <div className="form-foot">
-          <button className="btn btn-primary" type="submit" disabled={!loaded} data-testid="save-settings-button"><Check size={18} /> {loaded ? 'Save' : 'Loading…'}</button>
+          {editing ? (
+            <button className="btn btn-primary" type="submit" disabled={!loaded} data-testid="save-settings-button"><Check size={18} /> {loaded ? 'Save' : 'Loading…'}</button>
+          ) : (
+            <>
+              <span className="saved-pill" data-testid="settings-saved-pill"><CheckCircle2 size={16} /> Saved</span>
+              <button className="btn btn-ghost" type="button" onClick={() => setEditing(true)} data-testid="edit-settings-button"><Pencil size={16} /> Edit</button>
+            </>
+          )}
         </div>
       </form>
 

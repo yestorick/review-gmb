@@ -7,10 +7,11 @@ Owner's key direction (2026-08-20): the audience does NOT understand technology 
 
 ## Architecture
 - React 19 + React Router, Axios, Sonner, Lucide. Plain CSS design system in `src/styles.css` (blue/white, clean tables, no marketing fluff).
-- FastAPI + Motor/MongoDB, Pydantic models, JWT httpOnly access/refresh cookies, bcrypt hashing.
+- FastAPI + Motor/MongoDB, Pydantic models, JWT httpOnly access/refresh cookies, bcrypt hashing, login lockout after 8 wrong tries per email (15 min).
+- Auth: email/password + Emergent-managed Google sign-in (`POST /api/auth/google/session`, frontend redirects to `https://auth.emergentagent.com/?redirect={origin}/reviews` and exchanges the `session_id` from the URL hash) + forgot/reset password via Resend (`RESEND_API_KEY`, `SENDER_EMAIL`).
 - GPT 5.4 Mini via `emergentintegrations` (Emergent LLM key), generated in parallel chunks of 10 with dedupe.
 - Server-side QR PNG (data URL) from the random public slug.
-- Collections: `users`, `businesses` (one per owner, holds slug + Google review URL), `categories`, `reviews`.
+- Collections: `users`, `businesses` (one per owner, holds slug + Google review URL), `categories`, `reviews`, `password_resets`, `login_attempts`.
 
 ## Screens
 - `/` sign in / create account
@@ -31,6 +32,16 @@ Owner's key direction (2026-08-20): the audience does NOT understand technology 
 - 2026-08-20: **Bug fix (user reported): saving a Google review link failed.** Root cause: the validator regex rejected the most common format `https://g.page/r/{id}/review`. Replaced with `normalise_google_url()` — a Google host allow-list (g.page, maps.app.goo.gl, g.co, goo.gl, share.google, google.com + country domains, maps/search/business.google.com), auto `https://`, parsed with `urlsplit` so host-spoofing links (`https://evil.com#@google.com/`) are rejected. Verified by testing agent iterations 5 and 6 (66/66 pytest, full UI flow).
 - 2026-08-20: **Removed the logo & shop-photo feature** on the owner's request — upload endpoints, object storage helpers, DB fields (cleaned via `/app/scripts/drop_image_fields.py`), the My Business upload section and the public page images are all gone. Public page keeps name + "category · location".
 - 2026-08-20: Clipboard hardening — row copy, bulk copy, copy-link and the public page tap now fall back to a toast with the text instead of throwing when clipboard permission is denied (the public page always still redirects to Google). My Business Save is disabled until settings load, so a partial save can no longer wipe the business fields.
+- 2026-08-20: **Owner's 8-point simplicity batch** (testing agent iteration 7: 81/81 backend, all UI flows green):
+  1. Category page ADD NEW opens a popup modal (`CategoryModal`) with inline errors and 4 close paths.
+  2. Add Reviews uses a real category dropdown synced with saved categories + a "+ New" button that opens the same modal and auto-selects the result.
+  3. Reviews page has a "Show category" filter with per-category counts, page reset and "Show all".
+  4. My Business locks after saving: green "Saved" pill + "Edit" button; invalid Google links show an inline error.
+  5. Emergent-managed Google sign-in added next to email/password; Google-only accounts get friendly messages on password login / change password. Forgot password + `/reset-password` page with sha256 token, 1 h expiry, older tokens invalidated, email via Resend.
+  6. Eye show/hide toggle on every password field (`PasswordInput`).
+  7. Persistent inline error/success states on sign-in, forgot password, change password, reset password and My Business (no more disappearing-toast-only feedback).
+  8. **Used reviews vanish**: the public page serves only `status=available` drafts (no fallback), `use` is a single atomic `find_one_and_update` so two customers can never post the same review (409 on race), and an "All reviews are taken right now" state shows when the library is empty.
+- 2026-08-20: Post-review hardening — login lockout (429 after 8 wrong tries/15 min), 404 vs 409 semantics on public use, reset-token invalidation + indexes, friendlier filtered-empty copy. Resend key configured and a real reset email delivered successfully.
 
 ## Prioritized backlog
 - P1: Print-ready QR poster (A4/table-tent) download.
@@ -39,6 +50,8 @@ Owner's key direction (2026-08-20): the audience does NOT understand technology 
 - P2: WhatsApp share button for the review link.
 
 ## Known notes
-- Public page falls back to already-used reviews when a repeat visitor has seen everything in their session (intentional: the customer always gets something to post).
+- **Resend has no verified domain yet**: with `SENDER_EMAIL=onboarding@resend.dev`, Resend only delivers to the account owner's address (yestorick@gmail.com). Reset emails to any other address fail with a Resend 403 (logged, API still returns the neutral message). To go live the owner must verify a domain at resend.com/domains and change `SENDER_EMAIL`.
 - `PUT /api/settings` replaces all business fields, so the client must send the full form body.
-- `review_templates` and `password_reset_tokens` collections are now unused; `pillow`/`boto3` are unused after the image-feature removal.
+- Sessions are not revoked after a password change/reset (old refresh token stays valid up to 7 days).
+- Reviews `params` snapshot powers single-review regenerate.
+- `review_templates` collection and the `pillow`/`boto3` packages are unused leftovers.
