@@ -1,17 +1,17 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { ArrowRight } from 'lucide-react';
+import { ClipboardCheck, Quote } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../api';
 
 export default function PublicReview() {
   const { slug } = useParams();
   const [data, setData] = useState(null);
+  const [tab, setTab] = useState('all');
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    api.get(`/public/${slug}`).then((r) => setData(r.data)).catch(() => setData(false));
-  }, [slug]);
+  const load = () => api.get(`/public/${slug}`).then((r) => setData(r.data));
+  useEffect(() => { load().catch(() => setData(false)); }, [slug]);
 
   const choose = async (id) => {
     setBusy(true);
@@ -21,7 +21,7 @@ export default function PublicReview() {
     } catch (x) {
       if (x?.response?.status === 409) {
         toast.error('Someone just used that one. Pick another review.');
-        api.get(`/public/${slug}`).then((r) => setData(r.data)).catch(() => {});
+        load().catch(() => {});
       } else {
         toast.error('Please tap again to copy your review');
       }
@@ -36,38 +36,58 @@ export default function PublicReview() {
     window.location.href = result.google_url;
   };
 
-  if (data === false) return <div className="public-page"><div className="center-box"><span className="brand-mark">R</span><h1>Link not found</h1><p>This review link may be mistyped or not set up yet.</p></div></div>;
+  if (data === false) {
+    return (
+      <div className="public-page">
+        <div className="center-box"><span className="brand-mark">R</span><h1>Link not found</h1><p>This review link may be mistyped or not set up yet.</p></div>
+      </div>
+    );
+  }
   if (!data) return <div className="loading-screen">Loading…</div>;
 
-  const { business } = data;
+  const { business, categories = [] } = data;
+  const drafts = tab === 'all' ? data.drafts : data.drafts.filter((d) => d.category === tab);
 
   return (
     <div className="public-page">
       <div className="public-inner">
-        <div className="public-identity">
-          <span className="brand-mark">R</span>
-          <div>
-            <h1 data-testid="public-business-name">{business.name || 'Leave a review'}</h1>
-            {(business.category || business.location) && <p className="sub" style={{ margin: 0 }}>{[business.category, business.location].filter(Boolean).join(' · ')}</p>}
-          </div>
-        </div>
-        <p className="sub">Tap the one that feels like your visit. We copy it for you.</p>
-        {data.drafts.length === 0 ? (
-          <div className="center-box" data-testid="public-empty">
-            <strong style={{ fontSize: '1.05rem' }}>All reviews are taken right now</strong>
-            <p style={{ color: 'var(--body)' }}>Every ready-made review here has already been used. Please check back a little later — fresh ones are on the way.</p>
-          </div>
-        ) : (
-          <div className="review-cards">
-            {data.drafts.map((d, i) => (
-              <button className="review-card" key={d.id} disabled={busy} onClick={() => choose(d.id)} data-testid={`public-draft-${i}`}>
-                <span>{d.text}</span>
-                <ArrowRight size={18} />
-              </button>
+        <header className="public-head">
+          <h1 data-testid="public-business-name">{business.name || 'Leave a review'}</h1>
+          {(business.category || business.location) && (
+            <p className="public-meta">{[business.category, business.location].filter(Boolean).join(' · ')}</p>
+          )}
+          <p className="public-lead">Pick the review that matches your visit. We copy it and open Google for you.</p>
+        </header>
+
+        {categories.length > 1 && (
+          <div className="tab-strip" data-testid="public-tabs">
+            <button className={`tab${tab === 'all' ? ' on' : ''}`} onClick={() => setTab('all')} data-testid="public-tab-all">All Reviews</button>
+            {categories.map((c) => (
+              <button key={c} className={`tab${tab === c ? ' on' : ''}`} onClick={() => setTab(c)} data-testid={`public-tab-${c}`}>{c}</button>
             ))}
           </div>
         )}
-        <p className="public-foot">After tapping, paste it on Google and hit post. Takes 5 seconds.</p>
+
+        {drafts.length === 0 ? (
+          <div className="quote-card empty-card" data-testid="public-empty">
+            <strong>All reviews are taken right now</strong>
+            <p>Every ready-made review here has already been used. Please check back a little later — fresh ones are on the way.</p>
+          </div>
+        ) : (
+          <div className="quote-list">
+            {drafts.map((d, i) => (
+              <article className="quote-card" key={d.id} data-testid={`public-draft-${i}`}>
+                <Quote className="quote-mark" size={26} strokeWidth={0} fill="currentColor" />
+                <p className="quote-text">{d.text}</p>
+                <button className="copy-post" disabled={busy} onClick={() => choose(d.id)} data-testid={`public-copy-${i}`}>
+                  <ClipboardCheck size={18} /> Copy &amp; Post
+                </button>
+              </article>
+            ))}
+          </div>
+        )}
+
+        <p className="public-foot">After tapping, just paste it on Google and hit post. Takes 5 seconds.</p>
       </div>
     </div>
   );

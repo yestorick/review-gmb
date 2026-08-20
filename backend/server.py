@@ -477,7 +477,7 @@ async def public_page(slug: str):
         raise HTTPException(404, 'Review link not found')
     rows = await db.reviews.find({'business_id': b['id'], 'status': 'available'}, {'_id': 0, 'user_id': 0, 'params': 0}).sort('created_at', 1).to_list(2000)
     return {'business': {'name': b.get('name', ''), 'category': b.get('business_category', ''), 'location': b.get('location', '')},
-            'drafts': rows[:6], 'available': len(rows)}
+            'drafts': rows[:40], 'categories': sorted({r['category'] for r in rows[:40]}), 'available': len(rows)}
 
 
 @api.post('/public/{slug}/use/{review_id}')

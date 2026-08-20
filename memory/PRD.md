@@ -20,7 +20,7 @@ Owner's key direction (2026-08-20): the audience does NOT understand technology 
 - `/categories` Category List with add/delete
 - `/settings` My Business: name, category, location, service area, Google review link + QR/link with ACTIVE status
 - `/change-password`
-- `/r/:slug` public customer page: tap a review → copied → redirected to Google
+- `/r/:slug` public customer page: category pill tabs, white quote cards with "Copy & Post" → copied → redirected to Google (used reviews never reappear)
 
 ## What's implemented
 - 2026-08-17: Owner auth, business profile, keyword tags, URL validation, slug, QR, draft CRUD, GPT generation, public page, lifetime counter.
@@ -42,6 +42,7 @@ Owner's key direction (2026-08-20): the audience does NOT understand technology 
   7. Persistent inline error/success states on sign-in, forgot password, change password, reset password and My Business (no more disappearing-toast-only feedback).
   8. **Used reviews vanish**: the public page serves only `status=available` drafts (no fallback), `use` is a single atomic `find_one_and_update` so two customers can never post the same review (409 on race), and an "All reviews are taken right now" state shows when the library is empty.
 - 2026-08-20: Post-review hardening — login lockout (429 after 8 wrong tries/15 min), 404 vs 409 semantics on public use, reset-token invalidation + indexes, friendlier filtered-empty copy. Resend key configured and a real reset email delivered successfully.
+- 2026-08-20: **Customer page redesign** (reference-inspired): soft grey gradient background, pill category tabs ("All Reviews" + each category, dark navy active state, horizontal scroll), white 20px-radius quote cards with a blue quote mark, staggered entrance animation and a blue pill "Copy & Post" button per card. Public payload now returns up to 40 available drafts plus the category list. Verified end-to-end on mobile: tap → copy → redirect to Google and the used review is gone on reload.
 
 ## Prioritized backlog
 - P1: Print-ready QR poster (A4/table-tent) download.
