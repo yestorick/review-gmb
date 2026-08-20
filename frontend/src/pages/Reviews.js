@@ -36,13 +36,21 @@ export default function Reviews() {
   const togglePage = () => setSelected((s) => (allOnPage ? s.filter((id) => !pageIds.includes(id)) : [...new Set([...s, ...pageIds])]));
 
   const copy = async (text, message) => {
-    await navigator.clipboard.writeText(text);
-    toast.success(message);
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(message);
+    } catch {
+      toast.message('Copy it from here', { description: text });
+    }
   };
   const copySelected = async () => {
     const texts = reviews.filter((r) => selected.includes(r.id)).map((r) => r.text).join('\n\n');
-    await navigator.clipboard.writeText(texts);
-    toast.success(`${selected.length} reviews copied`);
+    try {
+      await navigator.clipboard.writeText(texts);
+      toast.success(`${selected.length} reviews copied`);
+    } catch {
+      toast.message('Copy them from here', { description: texts.slice(0, 400) });
+    }
   };
   const deleteSelected = async () => {
     if (!window.confirm(`Delete ${selected.length} selected reviews? This cannot be undone.`)) return;

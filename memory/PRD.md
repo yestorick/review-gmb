@@ -14,7 +14,7 @@ Owner's key direction (2026-08-20): the audience does NOT understand technology 
 
 ## Screens
 - `/` sign in / create account
-- `/reviews` Reviews List: link banner (copy + ACTIVE pill), 3 stat tiles, table (Sr. No., Category, Review, Status, Created, actions: regenerate / copy / edit / delete)
+- `/reviews` Reviews List: link banner (copy + ACTIVE pill), 3 stat tiles, bulk bar, pagination, table (Sr. No., Category, Review, Status, Created, actions: regenerate / copy / edit / delete)
 - `/reviews/new` Add Reviews form: Review Category, Business Name, Business Category, Keywords, What you are known for (USP), Location, Language (English / Other + own language), Review Tone (Mixed recommended, Friendly, Storytelling, Short & Direct, Natural, Detailed), Review Style, Review Length, Service Area, How many reviews (10/15/25/40/50), Anything else
 - `/categories` Category List with add/delete
 - `/settings` My Business: name, category, location, service area, Google review link + QR/link with ACTIVE status
@@ -28,6 +28,9 @@ Owner's key direction (2026-08-20): the audience does NOT understand technology 
 - 2026-08-20: Testing agent iteration 3 — 25/25 backend pytest cases and all frontend flows passed; fixed the reported desktop sidebar X, mobile URL overflow, used-count consistency and wasteful regenerate prompt.
 - 2026-08-20: **Bulk actions + logo/photo + walkthrough.** Reviews table now has row checkboxes, select-all-on-page, a bulk bar (Copy all / Delete all with confirm / Clear) and pagination (10/25/50 rows, prev/next, page info; selection clears on page change). My Business gained logo and shop-photo upload through Emergent Managed Object Storage (`POST/DELETE /api/business/image/{logo|photo}`, public `GET /api/public/{slug}/image/{kind}?v=`), with Pillow byte validation, 5 MB cap and previews. Public customer page shows the shop photo banner, logo and "category · location". First login shows a 3-step guided walkthrough (`onboarding_done` on the user, `POST /api/onboarding/complete`).
 - 2026-08-20: Testing agent iteration 4 — 39/39 backend pytest cases plus all new and regression frontend flows passed; fixed the reported settings-URL mobile overflow, extension-only image validation, missing public image cache-buster, cross-page selection confusion, walkthrough dot test IDs and broken-image handling.
+- 2026-08-20: **Bug fix (user reported): saving a Google review link failed.** Root cause: the validator regex rejected the most common format `https://g.page/r/{id}/review`. Replaced with `normalise_google_url()` — a Google host allow-list (g.page, maps.app.goo.gl, g.co, goo.gl, share.google, google.com + country domains, maps/search/business.google.com), auto `https://`, parsed with `urlsplit` so host-spoofing links (`https://evil.com#@google.com/`) are rejected. Verified by testing agent iterations 5 and 6 (66/66 pytest, full UI flow).
+- 2026-08-20: **Removed the logo & shop-photo feature** on the owner's request — upload endpoints, object storage helpers, DB fields (cleaned via `/app/scripts/drop_image_fields.py`), the My Business upload section and the public page images are all gone. Public page keeps name + "category · location".
+- 2026-08-20: Clipboard hardening — row copy, bulk copy, copy-link and the public page tap now fall back to a toast with the text instead of throwing when clipboard permission is denied (the public page always still redirects to Google). My Business Save is disabled until settings load, so a partial save can no longer wipe the business fields.
 
 ## Prioritized backlog
 - P1: Print-ready QR poster (A4/table-tent) download.
@@ -36,6 +39,6 @@ Owner's key direction (2026-08-20): the audience does NOT understand technology 
 - P2: WhatsApp share button for the review link.
 
 ## Known notes
-- Public page falls back to already-used reviews when a repeat visitor has seen everything in their session.
-- Object storage has no delete API, so replaced logos/photos stay as orphaned objects (DB reference is unset).
-- `review_templates` and `password_reset_tokens` collections are now unused.
+- Public page falls back to already-used reviews when a repeat visitor has seen everything in their session (intentional: the customer always gets something to post).
+- `PUT /api/settings` replaces all business fields, so the client must send the full form body.
+- `review_templates` and `password_reset_tokens` collections are now unused; `pillow`/`boto3` are unused after the image-feature removal.

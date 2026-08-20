@@ -161,13 +161,6 @@ thead th input[type="checkbox"], tbody td input[type="checkbox"] { width: 17px; 
 .pager select { padding: 6px 8px; border: 1px solid var(--line); border-radius: 7px; background: #fff; font-family: inherit; }
 .pager .icon-btn[disabled] { opacity: .35; cursor: default; }
 
-/* ---------- image upload ---------- */
-.upload-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
-.upload-box { display: flex; flex-direction: column; gap: 12px; border: 1px dashed var(--line); border-radius: 12px; padding: 18px; }
-.preview-logo { width: 88px; height: 88px; object-fit: cover; border-radius: 14px; border: 1px solid var(--line); background: #fff; }
-.preview-photo { width: 100%; max-width: 260px; height: 140px; object-fit: cover; border-radius: 12px; border: 1px solid var(--line); }
-.preview-empty { width: 88px; height: 88px; border-radius: 14px; background: #f2f6fc; color: var(--blue); display: grid; place-items: center; }
-
 /* ---------- walkthrough ---------- */
 .modal-scrim { position: fixed; inset: 0; background: rgba(20, 36, 58, .5); display: grid; place-items: center; padding: 20px; z-index: 60; }
 .modal {
@@ -184,10 +177,8 @@ thead th input[type="checkbox"], tbody td input[type="checkbox"] { width: 17px; 
 .dots span.on { background: var(--blue); }
 
 /* ---------- public identity ---------- */
-.public-photo { width: 100%; height: 160px; object-fit: cover; border-radius: 14px; margin-bottom: 14px; }
 .public-identity { display: flex; align-items: center; gap: 14px; }
 .public-identity h1 { margin: 0; }
-.public-logo { width: 52px; height: 52px; border-radius: 14px; object-fit: cover; border: 1px solid var(--line); background: #fff; }
 
 /* ---------- responsive ---------- */
 @media (max-width: 900px) {
@@ -202,7 +193,6 @@ thead th input[type="checkbox"], tbody td input[type="checkbox"] { width: 17px; 
   .form-grid { grid-template-columns: 1fr; }
   .stat { flex: 1 1 100px; min-width: 0; padding: 12px 14px; }
   .stat b { font-size: 1.25rem; }
-  .upload-grid { grid-template-columns: 1fr; }
   .pager { justify-content: space-between; }
   .page-title { font-size: 1.2rem; }
   td.review-text { min-width: 240px; }

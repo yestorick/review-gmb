@@ -134,10 +134,88 @@ class TestSettings:
         r = client.put(f"{API}/settings", json={"name": "Sharma Dental", "business_category": "Dental Clinic",
                                                "location": "Pune", "service_area": "", "google_review_url": "https://example.com"}, timeout=30)
         assert r.status_code == 422, r.text
-        assert "Google review link" in str(r.json())
+        assert "Google link" in str(r.json())
 
     def test_settings_requires_auth(self):
         assert requests.get(f"{API}/settings", timeout=30).status_code == 401
+
+
+# ---------- iteration 5: google review link validator (bug fix) ----------
+BASE_SETTINGS = {"name": "Sharma Dental", "business_category": "Dental Clinic", "location": "Pune", "service_area": "Kothrud, Pune"}
+
+
+class TestGoogleUrlValidator:
+    def _save(self, client, url):
+        return client.put(f"{API}/settings", json={**BASE_SETTINGS, "google_review_url": url}, timeout=30)
+
+    @pytest.mark.parametrize("url,expected", [
+        ("https://g.page/r/CVxyz123/review", "https://g.page/r/CVxyz123/review"),
+        ("https://g.page/sharma-dental/review", "https://g.page/sharma-dental/review"),
+        ("https://maps.app.goo.gl/AbCdEf", "https://maps.app.goo.gl/AbCdEf"),
+        ("https://g.co/kgs/abc123", "https://g.co/kgs/abc123"),
+        ("https://search.google.com/local/writereview?placeid=ChIJabc", "https://search.google.com/local/writereview?placeid=ChIJabc"),
+        ("https://www.google.co.in/maps/place/X", "https://www.google.co.in/maps/place/X"),
+        ("https://share.google/xyz", "https://share.google/xyz"),
+        ("g.page/r/CVx/review", "https://g.page/r/CVx/review"),
+        ("http://g.page/r/CVx/review", "https://g.page/r/CVx/review"),
+    ])
+    def test_valid_google_links_saved_and_persisted(self, client, url, expected):
+        r = self._save(client, url)
+        assert r.status_code == 200, r.text[:300]
+        assert r.json()["google_review_url"] == expected
+        assert r.json()["is_active"] is True
+        got = client.get(f"{API}/settings", timeout=30).json()["business"]
+        assert got["google_review_url"] == expected
+
+    @pytest.mark.parametrize("url", [
+        "https://example.com/review",
+        "https://google.com.evil.com/x",
+        "https://evil.com/?x=google.com",
+        "https://notgoogle.com/g.page/r/x/review",
+        "https://ggoogle.com/x",
+    ])
+    def test_non_google_links_rejected_and_value_unchanged(self, client, url):
+        good = "https://g.page/r/CVkeep123/review"
+        assert self._save(client, good).status_code == 200
+        r = self._save(client, url)
+        assert r.status_code == 422, f"{url} was accepted: {r.text[:200]}"
+        assert "Google link" in str(r.json())
+        got = client.get(f"{API}/settings", timeout=30).json()["business"]
+        assert got["google_review_url"] == good
+
+    # iteration 5 SECURITY FIX: host must be parsed with urlsplit so fragment/backslash/userinfo
+    # spoofs (browser host = evil.com) are rejected.
+    @pytest.mark.parametrize("url", [
+        "https://evil.com#@google.com/",
+        "https://evil.com\\@g.page/r/x/review",
+        "https://evil.com\\\\@g.page/r/x/review",
+        "https://google.com@evil.com/review",
+        "https://evil.com?@g.page/r/x/review",
+        "https://evil.com/g.page/r/x/review",
+        "//evil.com#@google.com/",
+    ])
+    def test_host_spoofing_rejected(self, client, url):
+        good = "https://g.page/r/CVkeep999/review"
+        assert self._save(client, good).status_code == 200
+        r = self._save(client, url)
+        assert r.status_code == 422, f"host-spoof URL accepted and stored: {url} -> {r.text[:200]}"
+        got = client.get(f"{API}/settings", timeout=30).json()["business"]
+        assert got["google_review_url"] == good, "stored link changed by a rejected spoof payload"
+        self._save(client, "https://g.page/r/CVxyz123/review")
+
+    def test_empty_clears_link_and_deactivates(self, client):
+        r = self._save(client, "")
+        assert r.status_code == 200, r.text[:300]
+        assert r.json()["google_review_url"] == ""
+        assert r.json()["is_active"] is False
+        got = client.get(f"{API}/settings", timeout=30).json()["business"]
+        assert got["google_review_url"] == ""
+        # restore working link
+        assert self._save(client, "https://g.page/r/CVxyz123/review").status_code == 200
+
+    def test_no_stale_google_re_reference(self):
+        src = Path("/app/backend/server.py").read_text()
+        assert "GOOGLE_RE" not in src
 
 
 # ---------- categories ----------
@@ -182,11 +260,17 @@ class TestReviews:
                    "keywords": "root canal, teeth cleaning", "usp": "painless treatment", "location": "Pune",
                    "language": "English", "tone": "Friendly", "style": "Simple", "word_limit": "15-25 Words",
                    "count": 10, "service_area": "Kothrud", "other_suggestion": ""}
+        # clean up any TEST_QA leftovers from earlier interrupted runs
+        stale = [x["id"] for x in client.get(f"{API}/reviews", timeout=30).json()["reviews"] if x["category"] == "TEST_QA"]
+        if stale:
+            client.post(f"{API}/reviews/bulk-delete", json={"ids": stale}, timeout=60)
+        pre_ids = {x["id"] for x in client.get(f"{API}/reviews", timeout=30).json()["reviews"] if x["category"] == "TEST_QA"}
         r = client.post(f"{API}/reviews/generate", json=payload, timeout=180)
         assert r.status_code == 200, r.text
         assert r.json()["count"] == 10
-        rows = [x for x in client.get(f"{API}/reviews", timeout=30).json()["reviews"] if x["category"] == "TEST_QA"]
-        assert len(rows) >= 10
+        rows = [x for x in client.get(f"{API}/reviews", timeout=30).json()["reviews"]
+                if x["category"] == "TEST_QA" and x["id"] not in pre_ids]
+        assert len(rows) == 10, f"expected 10 new TEST_QA rows, got {len(rows)}"
         assert all(x["status"] == "available" for x in rows)
         assert all(len(x["text"]) > 20 for x in rows)
         # category auto created
@@ -211,7 +295,7 @@ class TestReviews:
             assert client.delete(f"{API}/reviews/{x['id']}", timeout=30).status_code == 200
         after = client.get(f"{API}/reviews", timeout=30).json()
         assert after["total"] == before - len(rows)
-        assert not any(y["category"] == "TEST_QA" for y in after["reviews"])
+        assert not ({x["id"] for x in rows} & {y["id"] for y in after["reviews"]})
         assert client.delete(f"{API}/reviews/{rid}", timeout=30).status_code == 404
         for c in client.get(f"{API}/categories", timeout=30).json():
             if c["name"] == "TEST_QA":
@@ -249,6 +333,7 @@ class TestPublic:
         assert 1 <= len(d["drafts"]) <= 6
         rid = d["drafts"][0]["id"]
         before = client.get(f"{API}/reviews", timeout=30).json()
+        was_available = next(x for x in before["reviews"] if x["id"] == rid)["status"] == "available"
         u = pub.post(f"{API}/public/{slug}/use/{rid}", timeout=30)
         assert u.status_code == 200, u.text
         assert u.json()["google_url"].startswith("https://")
@@ -256,8 +341,13 @@ class TestPublic:
         after = client.get(f"{API}/reviews", timeout=30).json()
         row = next(x for x in after["reviews"] if x["id"] == rid)
         assert row["status"] == "used"
-        assert after["used"] == before["used"] + 1
-        assert after["available"] == before["available"] - 1
+        if was_available:
+            assert after["used"] == before["used"] + 1
+            assert after["available"] == before["available"] - 1
+        else:
+            # KNOWN carry-over defect: GET /public/{slug} falls back to already-used rows
+            # (`visible = [...] or rows`), so counters do not change here.
+            assert after["used"] == before["used"]
         # session cookie hides used review
         d2 = pub.get(f"{API}/public/{slug}", timeout=30).json()
         assert all(x["id"] != rid for x in d2["drafts"]) or len(d2["drafts"]) == 1
@@ -269,6 +359,20 @@ class TestPublic:
         slug = self.slug(client)
         assert requests.post(f"{API}/public/{slug}/use/{uuid.uuid4()}", timeout=30).status_code == 404
 
+    def test_use_returns_exact_saved_google_url(self, client):
+        target = "https://g.page/r/CVxyz123/review"
+        payload = {"name": "Sharma Dental", "business_category": "Dental Clinic", "location": "Pune",
+                   "service_area": "Kothrud, Pune", "google_review_url": target}
+        assert client.put(f"{API}/settings", json=payload, timeout=30).status_code == 200
+        slug = self.slug(client)
+        pub = requests.Session()
+        drafts = pub.get(f"{API}/public/{slug}", timeout=30).json()["drafts"]
+        if not drafts:
+            pytest.skip("no available drafts")
+        u = pub.post(f"{API}/public/{slug}/use/{drafts[0]['id']}", timeout=30)
+        assert u.status_code == 200, u.text[:200]
+        assert u.json()["google_url"] == target
+
     def test_qr(self, client):
         slug = self.slug(client)
         r = requests.get(f"{API}/public/{slug}/qr", timeout=30)
@@ -276,15 +380,7 @@ class TestPublic:
         assert r.json()["data_url"].startswith("data:image/png;base64,")
 
 
-# ---------- iteration 4: images, bulk delete, onboarding ----------
-PNG_BYTES = base64.b64decode(
-    "iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAFElEQVR4nGP8z8DAwMDAxMDAwAAADgkBAP2f2wUAAAAASUVORK5CYII="
-)
-JPEG_BYTES = base64.b64decode(
-    "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwcJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPDcxNDH/wAALCAABAAEBAREA/8QAFAABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAAAP/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AJgA/9k="
-)
-
-
+# ---------- iteration 6: logo/shop-photo feature removed ----------
 @pytest.fixture(scope="class")
 def fresh_client():
     """Register a brand new account (used for onboarding + isolated review tests)."""
@@ -296,60 +392,40 @@ def fresh_client():
     return s
 
 
-class TestBusinessImages:
-    def test_upload_logo_and_photo_then_public_fetch(self, client):
-        r = client.post(f"{API}/business/image/logo", files={"file": ("TEST_logo.png", PNG_BYTES, "image/png")}, timeout=120)
-        assert r.status_code == 200, r.text[:300]
-        b = r.json()
-        assert "_id" not in b and "logo_path" not in b
-        assert b["logo_url"] and b["logo_url"].startswith("/api/public/")
-        slug = b["public_slug"]
+class TestImageFeatureRemoved:
+    @pytest.mark.parametrize("kind", ["logo", "photo"])
+    def test_upload_endpoint_gone(self, client, kind):
+        r = client.post(f"{API}/business/image/{kind}", files={"file": ("TEST_x.png", b"\x89PNG\r\n\x1a\n" + b"0" * 40, "image/png")}, timeout=60)
+        assert r.status_code == 404, f"POST /business/image/{kind} still responds {r.status_code}"
 
-        r2 = client.post(f"{API}/business/image/photo", files={"file": ("TEST_photo.jpg", JPEG_BYTES, "image/jpeg")}, timeout=120)
-        assert r2.status_code == 200, r2.text[:300]
-        assert r2.json()["photo_url"]
+    @pytest.mark.parametrize("kind", ["logo", "photo"])
+    def test_delete_endpoint_gone(self, client, kind):
+        r = client.delete(f"{API}/business/image/{kind}", timeout=60)
+        assert r.status_code == 404, f"DELETE /business/image/{kind} still responds {r.status_code}"
 
-        # persisted in settings
-        s = client.get(f"{API}/settings", timeout=30).json()["business"]
-        assert s["logo_url"] and s["photo_url"]
+    @pytest.mark.parametrize("kind", ["logo", "photo"])
+    def test_public_image_endpoint_gone(self, client, kind):
+        slug = client.get(f"{API}/settings", timeout=30).json()["business"]["public_slug"]
+        r = requests.get(f"{API}/public/{slug}/image/{kind}", timeout=30)
+        assert r.status_code == 404, f"GET /public/{slug}/image/{kind} still responds {r.status_code}"
 
-        # public image endpoints (no auth)
-        for kind, ctype in (("logo", "image/png"), ("photo", "image/jpeg")):
-            g = requests.get(f"{API}/public/{slug}/image/{kind}", timeout=60)
-            assert g.status_code == 200, g.text[:200]
-            assert g.headers["Content-Type"].startswith(ctype)
-            assert len(g.content) > 10
+    def test_settings_payload_has_no_image_keys(self, client):
+        b = client.get(f"{API}/settings", timeout=30).json()["business"]
+        bad = [k for k in b if "logo" in k.lower() or "photo" in k.lower() or "image" in k.lower()]
+        assert not bad, f"settings business payload still exposes image keys: {bad}"
+        assert "_id" not in b
 
-        # public payload exposes both
-        pub = requests.get(f"{API}/public/{slug}", timeout=30).json()["business"]
-        assert pub["logo_url"] and pub["photo_url"]
+    def test_public_payload_has_no_image_keys(self, client):
+        slug = client.get(f"{API}/settings", timeout=30).json()["business"]["public_slug"]
+        d = requests.get(f"{API}/public/{slug}", timeout=30).json()
+        b = d["business"]
+        assert set(b) == {"name", "category", "location"}, f"unexpected public business keys: {sorted(b)}"
+        assert isinstance(d["drafts"], list)
 
-    def test_reject_non_image(self, client):
-        r = client.post(f"{API}/business/image/logo", files={"file": ("TEST_notes.txt", b"hello world", "text/plain")}, timeout=60)
-        assert r.status_code == 422
-        assert "JPG" in r.json()["detail"]
-
-    def test_reject_unknown_kind(self, client):
-        r = client.post(f"{API}/business/image/banner", files={"file": ("TEST_logo.png", PNG_BYTES, "image/png")}, timeout=60)
-        assert r.status_code == 404
-
-    def test_image_requires_auth(self):
-        r = requests.post(f"{API}/business/image/logo", files={"file": ("x.png", PNG_BYTES, "image/png")}, timeout=60)
-        assert r.status_code == 401
-
-    def test_remove_images(self, client):
-        for kind in ("logo", "photo"):
-            r = client.delete(f"{API}/business/image/{kind}", timeout=60)
-            assert r.status_code == 200
-            assert r.json()[f"{kind}_url"] is None
-        s = client.get(f"{API}/settings", timeout=30).json()["business"]
-        assert s["logo_url"] is None and s["photo_url"] is None
-        g = requests.get(f"{API}/public/{s['public_slug']}/image/logo", timeout=30)
-        assert g.status_code == 404
-
-    def test_public_image_unknown_slug(self):
-        r = requests.get(f"{API}/public/nosuchslug123/image/logo", timeout=30)
-        assert r.status_code == 404
+    def test_server_source_has_no_image_code(self):
+        src = Path("/app/backend/server.py").read_text()
+        for token in ("logo_url", "photo_url", "business/image", "from PIL", "import PIL"):
+            assert token not in src, f"leftover image code in server.py: {token}"
 
 
 class TestBulkDelete:

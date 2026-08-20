@@ -4,8 +4,6 @@ import { ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../api';
 
-const BACKEND = process.env.REACT_APP_BACKEND_URL;
-
 export default function PublicReview() {
   const { slug } = useParams();
   const [data, setData] = useState(null);
@@ -17,14 +15,20 @@ export default function PublicReview() {
 
   const choose = async (id) => {
     setBusy(true);
+    let result;
     try {
-      const r = await api.post(`/public/${slug}/use/${id}`);
-      await navigator.clipboard.writeText(r.data.text);
-      window.location.href = r.data.google_url;
+      result = (await api.post(`/public/${slug}/use/${id}`)).data;
     } catch {
       toast.error('Please tap again to copy your review');
       setBusy(false);
+      return;
     }
+    try {
+      await navigator.clipboard.writeText(result.text);
+    } catch {
+      toast.message('Copy it from here, then paste on Google', { description: result.text });
+    }
+    window.location.href = result.google_url;
   };
 
   if (data === false) return <div className="public-page"><div className="center-box"><span className="brand-mark">R</span><h1>Link not found</h1><p>This review link may be mistyped or not set up yet.</p></div></div>;
@@ -35,11 +39,8 @@ export default function PublicReview() {
   return (
     <div className="public-page">
       <div className="public-inner">
-        {business.photo_url && <img className="public-photo" src={`${BACKEND}${business.photo_url}`} alt={business.name} data-testid="public-photo" onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
         <div className="public-identity">
-          {business.logo_url
-            ? <img className="public-logo" src={`${BACKEND}${business.logo_url}`} alt={`${business.name} logo`} data-testid="public-logo" />
-            : <span className="brand-mark">R</span>}
+          <span className="brand-mark">R</span>
           <div>
             <h1 data-testid="public-business-name">{business.name || 'Leave a review'}</h1>
             {(business.category || business.location) && <p className="sub" style={{ margin: 0 }}>{[business.category, business.location].filter(Boolean).join(' · ')}</p>}
