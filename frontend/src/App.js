@@ -4,6 +4,7 @@ import { Menu } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import { api } from './api';
 import { Sidebar } from './components/Sidebar';
+import { Walkthrough } from './components/Walkthrough';
 import Auth from './pages/Auth';
 import Reviews from './pages/Reviews';
 import AddReview from './pages/AddReview';
@@ -13,7 +14,7 @@ import ChangePassword from './pages/ChangePassword';
 import PublicReview from './pages/PublicReview';
 import './styles.css';
 
-function Shell({ setUser, children }) {
+function Shell({ user, setUser, children }) {
   const [open, setOpen] = useState(false);
   const logout = async () => {
     await api.post('/auth/logout');
@@ -22,6 +23,7 @@ function Shell({ setUser, children }) {
   };
   return (
     <div className="shell">
+      {user && !user.onboarding_done && <Walkthrough onDone={() => setUser({ ...user, onboarding_done: true })} />}
       <Sidebar open={open} close={() => setOpen(false)} onLogout={logout} />
       {open && <div className="scrim" onClick={() => setOpen(false)} />}
       <main className="main">
@@ -43,7 +45,7 @@ export default function App() {
     api.get('/auth/me').then((r) => setUser(r.data)).catch(() => setUser(false)).finally(() => setChecking(false));
   }, []);
 
-  const owner = (element) => (user ? <Shell setUser={setUser}>{element}</Shell> : <Navigate to="/" replace />);
+  const owner = (element) => (user ? <Shell user={user} setUser={setUser}>{element}</Shell> : <Navigate to="/" replace />);
 
   return (
     <BrowserRouter>

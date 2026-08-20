@@ -4,6 +4,8 @@ import { ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../api';
 
+const BACKEND = process.env.REACT_APP_BACKEND_URL;
+
 export default function PublicReview() {
   const { slug } = useParams();
   const [data, setData] = useState(null);
@@ -28,11 +30,21 @@ export default function PublicReview() {
   if (data === false) return <div className="public-page"><div className="center-box"><span className="brand-mark">R</span><h1>Link not found</h1><p>This review link may be mistyped or not set up yet.</p></div></div>;
   if (!data) return <div className="loading-screen">Loading…</div>;
 
+  const { business } = data;
+
   return (
     <div className="public-page">
       <div className="public-inner">
-        <span className="brand-mark">R</span>
-        <h1 data-testid="public-business-name">{data.business.name || 'Leave a review'}</h1>
+        {business.photo_url && <img className="public-photo" src={`${BACKEND}${business.photo_url}`} alt={business.name} data-testid="public-photo" onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
+        <div className="public-identity">
+          {business.logo_url
+            ? <img className="public-logo" src={`${BACKEND}${business.logo_url}`} alt={`${business.name} logo`} data-testid="public-logo" />
+            : <span className="brand-mark">R</span>}
+          <div>
+            <h1 data-testid="public-business-name">{business.name || 'Leave a review'}</h1>
+            {(business.category || business.location) && <p className="sub" style={{ margin: 0 }}>{[business.category, business.location].filter(Boolean).join(' · ')}</p>}
+          </div>
+        </div>
         <p className="sub">Tap the one that feels like your visit. We copy it for you.</p>
         <div className="review-cards">
           {data.drafts.map((d, i) => (

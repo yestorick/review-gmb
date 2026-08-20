@@ -1,5 +1,6 @@
 import os
 import re
+import base64
 import uuid
 from pathlib import Path
 
@@ -273,3 +274,154 @@ class TestPublic:
         r = requests.get(f"{API}/public/{slug}/qr", timeout=30)
         assert r.status_code == 200
         assert r.json()["data_url"].startswith("data:image/png;base64,")
+
+
+# ---------- iteration 4: images, bulk delete, onboarding ----------
+PNG_BYTES = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAFElEQVR4nGP8z8DAwMDAxMDAwAAADgkBAP2f2wUAAAAASUVORK5CYII="
+)
+JPEG_BYTES = base64.b64decode(
+    "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwcJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPDcxNDH/wAALCAABAAEBAREA/8QAFAABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAAAP/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AJgA/9k="
+)
+
+
+@pytest.fixture(scope="class")
+def fresh_client():
+    """Register a brand new account (used for onboarding + isolated review tests)."""
+    s = requests.Session()
+    email = f"test_qa_{uuid.uuid4().hex[:10]}@qa-reviewboost.com"
+    r = s.post(f"{API}/auth/register", json={"email": email, "password": "QaPassw0rd!23"}, timeout=30)
+    assert r.status_code == 200, r.text[:300]
+    s.qa_email = email
+    return s
+
+
+class TestBusinessImages:
+    def test_upload_logo_and_photo_then_public_fetch(self, client):
+        r = client.post(f"{API}/business/image/logo", files={"file": ("TEST_logo.png", PNG_BYTES, "image/png")}, timeout=120)
+        assert r.status_code == 200, r.text[:300]
+        b = r.json()
+        assert "_id" not in b and "logo_path" not in b
+        assert b["logo_url"] and b["logo_url"].startswith("/api/public/")
+        slug = b["public_slug"]
+
+        r2 = client.post(f"{API}/business/image/photo", files={"file": ("TEST_photo.jpg", JPEG_BYTES, "image/jpeg")}, timeout=120)
+        assert r2.status_code == 200, r2.text[:300]
+        assert r2.json()["photo_url"]
+
+        # persisted in settings
+        s = client.get(f"{API}/settings", timeout=30).json()["business"]
+        assert s["logo_url"] and s["photo_url"]
+
+        # public image endpoints (no auth)
+        for kind, ctype in (("logo", "image/png"), ("photo", "image/jpeg")):
+            g = requests.get(f"{API}/public/{slug}/image/{kind}", timeout=60)
+            assert g.status_code == 200, g.text[:200]
+            assert g.headers["Content-Type"].startswith(ctype)
+            assert len(g.content) > 10
+
+        # public payload exposes both
+        pub = requests.get(f"{API}/public/{slug}", timeout=30).json()["business"]
+        assert pub["logo_url"] and pub["photo_url"]
+
+    def test_reject_non_image(self, client):
+        r = client.post(f"{API}/business/image/logo", files={"file": ("TEST_notes.txt", b"hello world", "text/plain")}, timeout=60)
+        assert r.status_code == 422
+        assert "JPG" in r.json()["detail"]
+
+    def test_reject_unknown_kind(self, client):
+        r = client.post(f"{API}/business/image/banner", files={"file": ("TEST_logo.png", PNG_BYTES, "image/png")}, timeout=60)
+        assert r.status_code == 404
+
+    def test_image_requires_auth(self):
+        r = requests.post(f"{API}/business/image/logo", files={"file": ("x.png", PNG_BYTES, "image/png")}, timeout=60)
+        assert r.status_code == 401
+
+    def test_remove_images(self, client):
+        for kind in ("logo", "photo"):
+            r = client.delete(f"{API}/business/image/{kind}", timeout=60)
+            assert r.status_code == 200
+            assert r.json()[f"{kind}_url"] is None
+        s = client.get(f"{API}/settings", timeout=30).json()["business"]
+        assert s["logo_url"] is None and s["photo_url"] is None
+        g = requests.get(f"{API}/public/{s['public_slug']}/image/logo", timeout=30)
+        assert g.status_code == 404
+
+    def test_public_image_unknown_slug(self):
+        r = requests.get(f"{API}/public/nosuchslug123/image/logo", timeout=30)
+        assert r.status_code == 404
+
+
+class TestBulkDelete:
+    def _seed(self, client, n=3):
+        ids = []
+        cat = "TEST_bulk"
+        for i in range(n):
+            # create rows directly through generate is slow; use edit-safe path: generate once is required,
+            # so instead reuse existing reviews by copying via generate is avoided. Use API of record:
+            pass
+        return ids
+
+    def test_bulk_delete_removes_only_selected(self, client):
+        before = client.get(f"{API}/reviews", timeout=60).json()
+        rows = before["reviews"]
+        if len(rows) < 4:
+            pytest.skip("need at least 4 existing reviews to test bulk delete safely")
+        target = [r["id"] for r in rows[:2]]
+        keep = rows[2]["id"]
+        r = client.post(f"{API}/reviews/bulk-delete", json={"ids": target}, timeout=60)
+        assert r.status_code == 200
+        assert r.json()["deleted"] == 2
+        after = client.get(f"{API}/reviews", timeout=60).json()
+        assert after["total"] == before["total"] - 2
+        remaining = {x["id"] for x in after["reviews"]}
+        assert not (set(target) & remaining)
+        assert keep in remaining
+
+    def test_bulk_delete_empty_ids_rejected(self, client):
+        r = client.post(f"{API}/reviews/bulk-delete", json={"ids": []}, timeout=30)
+        assert r.status_code == 422
+
+    def test_bulk_delete_unknown_ids(self, client):
+        r = client.post(f"{API}/reviews/bulk-delete", json={"ids": [str(uuid.uuid4())]}, timeout=30)
+        assert r.status_code == 200 and r.json()["deleted"] == 0
+
+    def test_bulk_delete_requires_auth(self):
+        r = requests.post(f"{API}/reviews/bulk-delete", json={"ids": [str(uuid.uuid4())]}, timeout=30)
+        assert r.status_code == 401
+
+    def test_bulk_delete_cross_user_isolation(self, client, fresh_client):
+        rows = client.get(f"{API}/reviews", timeout=60).json()["reviews"]
+        if not rows:
+            pytest.skip("owner has no reviews")
+        victim = rows[0]["id"]
+        r = fresh_client.post(f"{API}/reviews/bulk-delete", json={"ids": [victim]}, timeout=30)
+        assert r.status_code == 200 and r.json()["deleted"] == 0
+        still = {x["id"] for x in client.get(f"{API}/reviews", timeout=60).json()["reviews"]}
+        assert victim in still
+
+
+class TestOnboarding:
+    def test_new_user_onboarding_false_then_complete(self, fresh_client):
+        me = fresh_client.get(f"{API}/auth/me", timeout=30)
+        assert me.status_code == 200
+        assert me.json()["onboarding_done"] is False
+
+        r = fresh_client.post(f"{API}/onboarding/complete", timeout=30)
+        assert r.status_code == 200 and r.json()["ok"] is True
+
+        me2 = fresh_client.get(f"{API}/auth/me", timeout=30).json()
+        assert me2["onboarding_done"] is True
+
+        # persists across a fresh login
+        s2 = requests.Session()
+        lr = s2.post(f"{API}/auth/login", json={"email": fresh_client.qa_email, "password": "QaPassw0rd!23"}, timeout=30)
+        assert lr.status_code == 200
+        assert lr.json()["onboarding_done"] is True
+
+    def test_onboarding_requires_auth(self):
+        r = requests.post(f"{API}/onboarding/complete", timeout=30)
+        assert r.status_code == 401
+
+    def test_existing_owner_onboarding_done(self, client):
+        assert client.get(f"{API}/auth/me", timeout=30).json()["onboarding_done"] is True

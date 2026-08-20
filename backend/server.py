@@ -8,8 +8,10 @@ from typing import Optional
 import bcrypt
 import jwt
 import qrcode
+import requests
+from PIL import Image
 from bson import ObjectId
-from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, EmailStr, Field
@@ -26,6 +28,38 @@ TONES = ['Mixed (recommended)', 'Friendly', 'Storytelling', 'Short & Direct', 'N
 STYLES = ['Simple', 'Detailed', 'Story']
 WORD_LIMITS = ['15-25 Words', '25-40 Words', '40-50 Words', '50-70 Words']
 COUNTS = [10, 15, 25, 40, 50]
+STORAGE_BASE = (os.environ.get('INTEGRATION_PROXY_URL') or '').strip() or 'https://integrations.emergentagent.com'
+STORAGE_URL = STORAGE_BASE.rstrip('/') + '/objstore/api/v1/storage'
+APP_NAME = 'reviewboost'
+MIME_TYPES = {'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'png': 'image/png', 'webp': 'image/webp', 'gif': 'image/gif'}
+MAX_IMAGE_BYTES = 5 * 1024 * 1024
+storage_key = None
+
+
+def init_storage(force: bool = False):
+    global storage_key
+    if storage_key and not force:
+        return storage_key
+    resp = requests.post(f'{STORAGE_URL}/init', json={'emergent_key': os.environ['EMERGENT_LLM_KEY']}, timeout=30)
+    resp.raise_for_status()
+    storage_key = resp.json()['storage_key']
+    return storage_key
+
+
+def put_object(path: str, data: bytes, content_type: str) -> dict:
+    resp = requests.put(f'{STORAGE_URL}/objects/{path}', headers={'X-Storage-Key': init_storage(), 'Content-Type': content_type}, data=data, timeout=120)
+    if resp.status_code == 404:
+        resp = requests.put(f'{STORAGE_URL}/objects/{path}', headers={'X-Storage-Key': init_storage(force=True), 'Content-Type': content_type}, data=data, timeout=120)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def get_object(path: str) -> tuple[bytes, str]:
+    resp = requests.get(f'{STORAGE_URL}/objects/{path}', headers={'X-Storage-Key': init_storage()}, timeout=60)
+    if resp.status_code == 404:
+        resp = requests.get(f'{STORAGE_URL}/objects/{path}', headers={'X-Storage-Key': init_storage(force=True)}, timeout=60)
+    resp.raise_for_status()
+    return resp.content, resp.headers.get('Content-Type', 'image/png')
 
 
 @api.get('/')
@@ -38,7 +72,7 @@ def now():
 
 
 def public_user(u):
-    return {'id': str(u['_id']), 'email': u['email'], 'name': u.get('name', '')}
+    return {'id': str(u['_id']), 'email': u['email'], 'name': u.get('name', ''), 'onboarding_done': u.get('onboarding_done', False)}
 
 
 def hash_password(p):
@@ -92,9 +126,11 @@ async def owner_business(user, create=False):
 def clean_business(b):
     if not b:
         return None
-    out = {k: v for k, v in b.items() if k not in ('_id', 'user_id')}
+    out = {k: v for k, v in b.items() if k not in ('_id', 'user_id', 'logo_path', 'photo_path')}
     out['public_url'] = f"{FRONTEND_URL}/r/{b['public_slug']}"
     out['is_active'] = bool(b.get('google_review_url'))
+    for kind in ('logo', 'photo'):
+        out[f'{kind}_url'] = f"/api/public/{b['public_slug']}/image/{kind}?v={b.get(kind + '_version', 0)}" if b.get(f'{kind}_path') else None
     return out
 
 
@@ -138,6 +174,10 @@ class GenerateIn(BaseModel):
 
 class ReviewIn(BaseModel):
     text: str = Field(min_length=10, max_length=900)
+
+
+class BulkIn(BaseModel):
+    ids: list[str] = Field(min_length=1, max_length=500)
 
 
 @api.post('/auth/register')
@@ -198,6 +238,59 @@ async def save_settings(body: SettingsIn, u=Depends(current_user)):
               'location': body.location.strip(), 'service_area': body.service_area.strip(), 'google_review_url': url}
     await db.businesses.update_one({'id': b['id']}, {'$set': update})
     return clean_business({**b, **update})
+
+
+@api.post('/onboarding/complete')
+async def complete_onboarding(u=Depends(current_user)):
+    await db.users.update_one({'_id': u['_id']}, {'$set': {'onboarding_done': True}})
+    return {'ok': True}
+
+
+@api.post('/business/image/{kind}')
+async def upload_business_image(kind: str, file: UploadFile = File(...), u=Depends(current_user)):
+    if kind not in ('logo', 'photo'):
+        raise HTTPException(404, 'Unknown image type')
+    ext = (file.filename or '').rsplit('.', 1)[-1].lower()
+    if ext not in MIME_TYPES:
+        raise HTTPException(422, 'Please upload a JPG, PNG or WEBP image')
+    data = await file.read()
+    if not data or len(data) > MAX_IMAGE_BYTES:
+        raise HTTPException(422, 'Please upload an image smaller than 5 MB')
+    try:
+        Image.open(io.BytesIO(data)).verify()
+    except Exception:
+        raise HTTPException(422, 'That file is not a valid image. Please upload a JPG, PNG or WEBP photo.')
+    b = await owner_business(u, create=True)
+    path = f"{APP_NAME}/uploads/{str(u['_id'])}/{kind}-{uuid.uuid4()}.{ext}"
+    try:
+        result = await asyncio.to_thread(put_object, path, data, MIME_TYPES[ext])
+    except Exception as e:
+        logging.exception(e)
+        raise HTTPException(502, 'Upload failed. Please try again.')
+    await db.businesses.update_one({'id': b['id']}, {'$set': {f'{kind}_path': result['path'], f'{kind}_content_type': MIME_TYPES[ext]}, '$inc': {f'{kind}_version': 1}})
+    return clean_business(await db.businesses.find_one({'id': b['id']}))
+
+
+@api.delete('/business/image/{kind}')
+async def remove_business_image(kind: str, u=Depends(current_user)):
+    if kind not in ('logo', 'photo'):
+        raise HTTPException(404, 'Unknown image type')
+    b = await owner_business(u, create=True)
+    await db.businesses.update_one({'id': b['id']}, {'$unset': {f'{kind}_path': ''}})
+    return clean_business(await db.businesses.find_one({'id': b['id']}))
+
+
+@api.get('/public/{slug}/image/{kind}')
+async def public_business_image(slug: str, kind: str):
+    b = await db.businesses.find_one({'public_slug': slug})
+    if not b or kind not in ('logo', 'photo') or not b.get(f'{kind}_path'):
+        raise HTTPException(404, 'Image not found')
+    try:
+        data, content_type = await asyncio.to_thread(get_object, b[f'{kind}_path'])
+    except Exception as e:
+        logging.exception(e)
+        raise HTTPException(404, 'Image not found')
+    return Response(content=data, media_type=b.get(f'{kind}_content_type', content_type), headers={'Cache-Control': 'public, max-age=3600'})
 
 
 @api.get('/categories')
@@ -324,6 +417,12 @@ async def delete_review(review_id: str, u=Depends(current_user)):
     return {'ok': True}
 
 
+@api.post('/reviews/bulk-delete')
+async def bulk_delete_reviews(body: BulkIn, u=Depends(current_user)):
+    r = await db.reviews.delete_many({'id': {'$in': body.ids}, 'user_id': str(u['_id'])})
+    return {'deleted': r.deleted_count}
+
+
 @api.post('/reviews/{review_id}/regenerate')
 async def regenerate_review(review_id: str, u=Depends(current_user)):
     doc = await db.reviews.find_one({'id': review_id, 'user_id': str(u['_id'])})
@@ -350,7 +449,9 @@ async def public_page(slug: str, request: Request):
     session = request.cookies.get('review_session')
     used = set(session.split(',')) if session else set()
     visible = [r for r in rows if r['id'] not in used] or rows
-    return {'business': {'name': b.get('name', ''), 'category': b.get('business_category', ''), 'location': b.get('location', '')},
+    return {'business': {'name': b.get('name', ''), 'category': b.get('business_category', ''), 'location': b.get('location', ''),
+                         'logo_url': f"/api/public/{slug}/image/logo?v={b.get('logo_version', 0)}" if b.get('logo_path') else None,
+                         'photo_url': f"/api/public/{slug}/image/photo?v={b.get('photo_version', 0)}" if b.get('photo_path') else None},
             'drafts': visible[:6]}
 
 
@@ -388,6 +489,10 @@ async def startup():
     await db.users.create_index('email', unique=True)
     await db.businesses.create_index('public_slug', unique=True)
     await db.reviews.create_index('business_id')
+    try:
+        await asyncio.to_thread(init_storage)
+    except Exception as e:
+        logging.error('Storage init failed: %s', e)
 
 
 @app.on_event('shutdown')

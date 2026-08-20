@@ -26,15 +26,16 @@ Owner's key direction (2026-08-20): the audience does NOT understand technology 
 - 2026-08-18: Blue-first visual system refresh.
 - 2026-08-20: **Full simplification rebuild.** Replaced the premium marketing dashboard with a plain sidebar + table dashboard (Reviews, Category, My Business, Change Password, Logout). New Add Reviews form with tone/style/length/language/count options and batch generation of 10–50 reviews. Per-review AVAILABLE → USED status that flips automatically when a customer taps it on the public page. Single-review regenerate, inline edit, copy, delete with confirm. Category CRUD. Change password endpoint. Removed old `/api/business`, `/api/drafts/*`, `/api/auth/google`, the landing page and `App.css`.
 - 2026-08-20: Testing agent iteration 3 — 25/25 backend pytest cases and all frontend flows passed; fixed the reported desktop sidebar X, mobile URL overflow, used-count consistency and wasteful regenerate prompt.
+- 2026-08-20: **Bulk actions + logo/photo + walkthrough.** Reviews table now has row checkboxes, select-all-on-page, a bulk bar (Copy all / Delete all with confirm / Clear) and pagination (10/25/50 rows, prev/next, page info; selection clears on page change). My Business gained logo and shop-photo upload through Emergent Managed Object Storage (`POST/DELETE /api/business/image/{logo|photo}`, public `GET /api/public/{slug}/image/{kind}?v=`), with Pillow byte validation, 5 MB cap and previews. Public customer page shows the shop photo banner, logo and "category · location". First login shows a 3-step guided walkthrough (`onboarding_done` on the user, `POST /api/onboarding/complete`).
+- 2026-08-20: Testing agent iteration 4 — 39/39 backend pytest cases plus all new and regression frontend flows passed; fixed the reported settings-URL mobile overflow, extension-only image validation, missing public image cache-buster, cross-page selection confusion, walkthrough dot test IDs and broken-image handling.
 
 ## Prioritized backlog
 - P1: Print-ready QR poster (A4/table-tent) download.
-- P1: Bulk actions on the reviews table (select many → delete / copy all) and pagination for 300+ reviews.
-- P1: Optional business logo shown on the public review page.
 - P2: Duplicate/similarity warning across a large review library.
-- P2: Simple "how it works" one-page onboarding for first login.
 - P2: Emergent-managed Google sign-in (was requested earlier, deferred by the simplification rebuild).
+- P2: WhatsApp share button for the review link.
 
 ## Known notes
 - Public page falls back to already-used reviews when a repeat visitor has seen everything in their session.
+- Object storage has no delete API, so replaced logos/photos stay as orphaned objects (DB reference is unset).
 - `review_templates` and `password_reset_tokens` collections are now unused.
