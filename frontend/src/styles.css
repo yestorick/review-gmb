@@ -213,15 +213,15 @@ td.review-text { min-width: 320px; line-height: 1.55; }
 
 /* ---------- reviews hero ---------- */
 .hero-card {
-  background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 22px 24px;
-  margin-bottom: 18px; box-shadow: 0 6px 22px rgba(20, 36, 58, .05);
+  background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 18px 20px;
+  margin-bottom: 14px; box-shadow: 0 6px 22px rgba(20, 36, 58, .05);
 }
 .hero-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; flex-wrap: wrap; }
 .hero-title { margin: 0; font-size: 1.35rem; display: flex; align-items: center; gap: 10px; }
 .count-badge { background: #eaf3ff; color: var(--blue); font-size: .85rem; font-weight: 700; padding: 4px 11px; border-radius: 999px; }
 .hero-sub { margin: 6px 0 0; color: var(--body); font-size: .92rem; line-height: 1.5; }
 
-.share-box { margin-top: 20px; background: #f7f9fd; border: 1px solid #e7edf6; border-radius: 14px; padding: 16px; }
+.share-box { margin-top: 14px; background: #f7f9fd; border: 1px solid #e7edf6; border-radius: 14px; padding: 16px; }
 .share-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
 .share-label { display: flex; align-items: center; gap: 7px; font-size: .82rem; font-weight: 600; color: var(--body); text-transform: uppercase; letter-spacing: .05em; }
 .dot-pill { display: inline-flex; align-items: center; gap: 7px; font-size: .78rem; font-weight: 700; padding: 5px 12px; border-radius: 999px; text-decoration: none; }
@@ -246,13 +246,26 @@ td.review-text { min-width: 320px; line-height: 1.55; }
 }
 .chip-btn:hover { border-color: var(--blue); color: var(--blue); transform: translateY(-1px); }
 
-.metric-row { display: flex; gap: 12px; margin-top: 18px; }
+.metric-row { display: flex; gap: 10px; margin-top: 14px; }
 .metric { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
 .metric b { display: block; font-size: 1.35rem; line-height: 1.2; }
 .metric span { color: var(--body); font-size: .8rem; }
 .metric.ok { background: #f3fbf6; border-color: #d8eee1; }
 .metric.ok b { color: var(--green); }
 .metric.used { background: #f8f9fc; }
+
+.qr-modal { max-width: 400px; text-align: center; }
+.qr-modal h2 { margin: 4px 0 8px; }
+.qr-frame {
+  margin: 20px auto 12px; background: #fff; border: 1px solid var(--line); border-radius: 18px;
+  padding: 18px; display: inline-flex; flex-direction: column; align-items: center; gap: 12px;
+  box-shadow: 0 10px 26px rgba(20, 36, 58, .08);
+}
+.qr-frame img { display: block; }
+.qr-skeleton { width: 220px; height: 220px; border-radius: 12px; background: linear-gradient(100deg, #eef2f8, #f8fafd, #eef2f8); animation: shimmer 1.2s linear infinite; }
+@keyframes shimmer { from { background-position: -200px 0; } to { background-position: 200px 0; } }
+.qr-caption { font-weight: 700; font-size: .95rem; max-width: 220px; }
+.qr-url { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .82rem; color: var(--body); overflow-wrap: anywhere; margin: 0; }
 
 /* ---------- inline states, password, filter ---------- */
 .inline-error, .inline-success {
@@ -393,14 +406,23 @@ thead th input[type="checkbox"], tbody td input[type="checkbox"] { width: 17px; 
     padding: 14px 0; position: sticky; top: 0; background: var(--bg); z-index: 20;
   }
   .form-grid { grid-template-columns: 1fr; }
-  .hero-card { padding: 18px 16px; border-radius: 16px; }
-  .hero-top { flex-direction: column; align-items: stretch; gap: 14px; }
-  .hero-top .btn { justify-content: center; }
-  .hero-title { font-size: 1.2rem; }
-  .metric-row { gap: 8px; }
-  .metric { padding: 10px 11px; }
-  .metric b { font-size: 1.15rem; }
+  .hero-card { padding: 14px; border-radius: 16px; margin-bottom: 12px; }
+  .hero-top { align-items: center; gap: 10px; flex-wrap: nowrap; }
+  .hero-top .btn { padding: 10px 14px; font-size: .86rem; white-space: nowrap; }
+  .hero-title { font-size: 1.15rem; }
+  .hero-sub { display: none; }
+  .share-box { margin-top: 12px; padding: 12px; }
+  .share-head { margin-bottom: 8px; }
+  .share-label { font-size: .72rem; }
+  .share-actions { gap: 8px; margin-top: 10px; }
+  .share-actions .chip-btn span { display: none; }
+  .share-actions .chip-btn { padding: 10px 0; }
+  .metric-row { gap: 8px; margin-top: 12px; }
+  .metric { display: flex; align-items: baseline; gap: 6px; padding: 8px 10px; border-radius: 10px; }
+  .metric b { font-size: 1rem; }
   .metric span { font-size: .72rem; }
+  .filter-row { margin-bottom: 10px; }
+  .filter-label { font-size: .82rem; }
   .share-actions .chip-btn { flex: 1; justify-content: center; white-space: nowrap; padding: 9px 10px; font-size: .84rem; }
   .link-chip { font-size: .82rem; padding: 11px 12px; gap: 6px; }
   .stat { flex: 1 1 100px; min-width: 0; padding: 12px 14px; }

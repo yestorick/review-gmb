@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { api, errText } from '../api';
 import { ReviewEditModal } from '../components/ReviewEditModal';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { QrModal } from '../components/QrModal';
 
 const shortDate = (iso) => new Date(iso).toLocaleDateString('en-GB').replaceAll('/', '-');
 const splitLink = (url) => {
@@ -23,6 +24,7 @@ export default function Reviews() {
   const [pageSize, setPageSize] = useState(10);
   const [category, setCategory] = useState('all');
   const [confirming, setConfirming] = useState(null);
+  const [showQr, setShowQr] = useState(false);
 
   const load = async () => {
     try {
@@ -99,6 +101,7 @@ export default function Reviews() {
 
   return (
     <>
+      {showQr && b && <QrModal slug={b.public_slug} publicUrl={b.public_url} businessName={b.name} onClose={() => setShowQr(false)} />}
       {confirming && (
         <ConfirmModal title={confirming.kind === 'bulk' ? `Delete ${selected.length} reviews?` : 'Delete this review?'}
           body="This cannot be undone. You can always generate fresh reviews afterwards."
@@ -113,7 +116,7 @@ export default function Reviews() {
             </h1>
             <p className="hero-sub">Share your link or QR — customers tap a review and post it on Google.</p>
           </div>
-          <Link className="btn btn-primary" to="/reviews/new" data-testid="add-new-button"><Plus size={18} /> Add new</Link>
+          <Link className="btn btn-primary" to="/reviews/new" data-testid="add-new-button"><Plus size={18} /> Add new reviews</Link>
         </div>
 
         {b && (
@@ -130,9 +133,9 @@ export default function Reviews() {
               <ExternalLink size={15} />
             </a>
             <div className="share-actions">
-              <button className="chip-btn" onClick={() => copy(b.public_url, 'Link copied')} data-testid="copy-link-button"><Copy size={16} /> Copy link</button>
-              <button className="chip-btn" onClick={() => share(b.public_url)} data-testid="share-link-button"><Share2 size={16} /> Share</button>
-              <Link className="chip-btn" to="/settings" data-testid="qr-link-button"><QrCode size={16} /> QR code</Link>
+              <button className="chip-btn" onClick={() => copy(b.public_url, 'Link copied')} data-testid="copy-link-button"><Copy size={16} /> <span>Copy link</span></button>
+              <button className="chip-btn" onClick={() => share(b.public_url)} data-testid="share-link-button"><Share2 size={16} /> <span>Share</span></button>
+              <button className="chip-btn" onClick={() => setShowQr(true)} data-testid="qr-link-button"><QrCode size={16} /> <span>QR code</span></button>
             </div>
           </div>
         )}

@@ -55,6 +55,8 @@ Owner's key direction (2026-08-20): the audience does NOT understand technology 
 
 - 2026-08-21: **Humanize option** on Add Reviews — a prominent toggle (default off, marked recommended) that switches generation to a real-Indian-customer voice: simple everyday words, no salesy adjectives, varied openings and lengths, one small specific human detail per review, light Indian English rhythm, single specific praise, keywords only where natural (about half the batch) and strictly one language/script. Tone/Style/Length selects grey out while it is on (`humanize` flag on `POST /api/reviews/generate`, `HUMANIZE_RULES` in server.py). Verified with two live 10-review batches: varied openings, real details (wait times, staff name, day/time), no non-Latin script leakage, no keyword stuffing.
 
+- 2026-08-21: **Reviews page header redesign** — replaced the dated stacked header/link banner with a hero card: title + count badge, "Add new reviews" CTA, compact link chip (host truncated, `/r/slug` always bold and visible), Active status dot, Copy / Share (Web Share API) / QR chips, and three colour-coded metric tiles (Total / Ready to use / Posted). Mobile is condensed (icon-only chips, inline metrics, subtitle hidden) so the first review is visible without scrolling. Beta notice added to the sign-in screen. New `QrModal` shows the final QR with the business name and a one-tap PNG download.
+
 ## Prioritized backlog
 - P1: Print-ready QR poster (A4/table-tent) download.
 - P2: Duplicate/similarity warning across a large review library.
