@@ -4,6 +4,7 @@ import { Menu } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import { api } from './api';
 import { Sidebar } from './components/Sidebar';
+import { MobileNav } from './components/MobileNav';
 import { Walkthrough } from './components/Walkthrough';
 import Auth from './pages/Auth';
 import AuthCallback from './pages/AuthCallback';
@@ -12,7 +13,7 @@ import Reviews from './pages/Reviews';
 import AddReview from './pages/AddReview';
 import Categories from './pages/Categories';
 import Settings from './pages/Settings';
-import ChangePassword from './pages/ChangePassword';
+import Profile from './pages/Profile';
 import PublicReview from './pages/PublicReview';
 import './styles.css';
 import { BrandLockup } from './components/Logo';
@@ -36,6 +37,7 @@ function Shell({ user, setUser, children }) {
         </div>
         {children}
       </main>
+      <MobileNav />
     </div>
   );
 }
@@ -65,7 +67,8 @@ function Router() {
       <Route path="/reviews/new" element={owner(<AddReview />)} />
       <Route path="/categories" element={owner(<Categories />)} />
       <Route path="/settings" element={owner(<Settings />)} />
-      <Route path="/change-password" element={owner(<ChangePassword />)} />
+      <Route path="/profile" element={owner(<Profile user={user} />)} />
+      <Route path="/change-password" element={<Navigate to="/profile" replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

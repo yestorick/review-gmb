@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Check, CheckCircle2, Copy, Download, Pencil } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Check, CheckCircle2, Copy, Download, Pencil, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, errText } from '../api';
 
@@ -89,6 +90,20 @@ export default function Settings() {
           )}
         </div>
       </form>
+
+      {business && (
+        <div className="form-card next-step" data-testid="next-step-card">
+          <h2 style={{ fontSize: '1.05rem', marginTop: 0 }}>{business.is_active ? "What's next?" : 'One step left'}</h2>
+          <p className="page-help" style={{ marginTop: 0 }}>
+            {business.is_active
+              ? 'Your link is live. Now create your ready-made reviews so customers have something to post.'
+              : 'Add your Google review link above and tap Save. Then your link and QR start working.'}
+          </p>
+          <Link className={`btn ${business.is_active ? 'btn-primary' : 'btn-ghost'}`} to="/reviews/new" data-testid="next-step-add-reviews">
+            <Sparkles size={18} /> {business.is_active ? 'Add reviews now' : 'Skip for now — add reviews'}
+          </Link>
+        </div>
+      )}
 
       {business && (
         <div className="form-card">

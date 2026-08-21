@@ -3,12 +3,14 @@ import { Plus, Shapes, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, errText } from '../api';
 import { CategoryModal } from '../components/CategoryModal';
+import { ConfirmModal } from '../components/ConfirmModal';
 
 const shortDate = (iso) => new Date(iso).toLocaleDateString('en-GB').replaceAll('/', '-');
 
 export default function Categories() {
   const [rows, setRows] = useState([]);
   const [showModal, setShowModal] = useState(false);
+  const [confirming, setConfirming] = useState(null);
 
   const load = async () => {
     try { setRows((await api.get('/categories')).data); } catch (x) { toast.error(errText(x)); }
@@ -16,12 +18,15 @@ export default function Categories() {
   useEffect(() => { load(); }, []);
 
   const remove = async (id) => {
-    if (!window.confirm('Delete this category?')) return;
     try { await api.delete(`/categories/${id}`); toast.success('Category deleted'); load(); } catch (x) { toast.error(errText(x)); }
   };
 
   return (
     <>
+      {confirming && (
+        <ConfirmModal title={`Delete "${confirming.name}"?`} body="The category is removed from your list. Reviews already written keep their name."
+          onConfirm={() => remove(confirming.id)} onClose={() => setConfirming(null)} />
+      )}
       {showModal && <CategoryModal onClose={() => setShowModal(false)} onCreated={() => { toast.success('Category added'); load(); }} />}
 
       <div className="page-head">
@@ -40,10 +45,10 @@ export default function Categories() {
               <tbody>
                 {rows.map((c, i) => (
                   <tr key={c.id} data-testid={`category-row-${i}`}>
-                    <td>{i + 1}</td>
-                    <td>{c.name}</td>
-                    <td>{shortDate(c.created_at)}</td>
-                    <td><button className="icon-btn danger" onClick={() => remove(c.id)} data-testid={`category-delete-${i}`}><Trash2 size={17} /></button></td>
+                    <td className="cell-sr">{i + 1}</td>
+                    <td className="cell-name"><strong>{c.name}</strong></td>
+                    <td className="cell-date">{shortDate(c.created_at)}</td>
+                    <td className="cell-actions"><button className="act-btn danger" onClick={() => setConfirming(c)} data-testid={`category-delete-${i}`}><Trash2 size={17} /> <span>Delete</span></button></td>
                   </tr>
                 ))}
               </tbody>

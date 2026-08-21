@@ -8,7 +8,6 @@ const steps = [
   { icon: Sparkles, title: 'Step 2 — Let us write your reviews', body: 'Tap ADD NEW, fill a short form (keywords, tone, how many) and we write ready-to-post reviews for you.' },
   { icon: QrCode, title: 'Step 3 — Share your QR code', body: 'Print the QR or send the link. Your customer taps a review, it is copied, and they post it on Google.' },
 ];
-
 export const Walkthrough = ({ onDone }) => {
   const nav = useNavigate();
   const [i, setI] = useState(0);

@@ -1,12 +1,12 @@
 import { NavLink } from 'react-router-dom';
-import { KeyRound, LayoutList, LogOut, Settings, Shapes, X } from 'lucide-react';
+import { LayoutList, LogOut, Settings, Shapes, UserCircle, X } from 'lucide-react';
 import { BrandLockup } from './Logo';
 
 const items = [
   { to: '/reviews', label: 'Reviews', icon: LayoutList, testid: 'nav-reviews' },
   { to: '/categories', label: 'Category', icon: Shapes, testid: 'nav-categories' },
   { to: '/settings', label: 'My Business', icon: Settings, testid: 'nav-settings' },
-  { to: '/change-password', label: 'Change Password', icon: KeyRound, testid: 'nav-change-password' },
+  { to: '/profile', label: 'My Profile', icon: UserCircle, testid: 'nav-profile' },
 ];
 
 export const Sidebar = ({ open, close, onLogout }) => (

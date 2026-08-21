@@ -363,7 +363,7 @@ class TestPublic:
         assert r.status_code == 200, r.text
         d = r.json()
         assert d["business"]["name"]
-        assert 1 <= len(d["drafts"]) <= 6
+        assert 1 <= len(d["drafts"]) <= 40
         assert isinstance(d["available"], int) and d["available"] >= len(d["drafts"])
         assert all(x["status"] == "available" for x in d["drafts"])
         rid = d["drafts"][0]["id"]
@@ -571,16 +571,21 @@ class TestPublicAvailableOnly:
         assert used.json()["text"] not in [x["text"] for x in d2["drafts"]]
         mdb.reviews.delete_many({"id": {"$in": ids}})
 
-    def test_drafts_capped_at_six(self, seeded_public):
+    def test_drafts_capped_at_forty(self, seeded_public):
+        """public page now returns up to 40 drafts (cap raised from 6)."""
         slug = seeded_public["slug"]
-        ids = seed_reviews(slug, 8, prefix="TEST_it7_cap")
-        d = requests.get(f"{API}/public/{slug}", timeout=30).json()
-        assert d["available"] == 8
-        assert len(d["drafts"]) == 6
-        mdb.reviews.delete_many({"id": {"$in": ids}})
+        ids = seed_reviews(slug, 45, prefix="TEST_it7_cap")
+        try:
+            d = requests.get(f"{API}/public/{slug}", timeout=30).json()
+            assert d["available"] == 45
+            assert len(d["drafts"]) == 40
+        finally:
+            mdb.reviews.delete_many({"id": {"$in": ids}})
 
     def test_zero_available_returns_empty_state_payload(self, seeded_public):
         slug = seeded_public["slug"]
+        b = mdb.businesses.find_one({"public_slug": slug})
+        mdb.reviews.delete_many({"business_id": b["id"]})
         ids = seed_reviews(slug, 1, prefix="TEST_it7_empty")
         assert requests.post(f"{API}/public/{slug}/use/{ids[0]}", timeout=30).status_code == 200
         d = requests.get(f"{API}/public/{slug}", timeout=30).json()
@@ -731,3 +736,44 @@ class TestPasswordReset:
         r = requests.post(f"{API}/auth/reset-password", json={"token": raw, "password": "short"}, timeout=30)
         assert r.status_code == 422
         assert mdb.password_resets.find_one({"token_hash": hashlib.sha256(raw.encode()).hexdigest()})["used"] is False
+
+
+# ---------- profile payload (/api/auth/me extra fields for My Profile page) ----------
+class TestProfilePayload:
+    def test_me_returns_profile_fields(self, client):
+        r = client.get(f"{API}/auth/me", timeout=30)
+        assert r.status_code == 200, r.text[:300]
+        d = r.json()
+        assert "_id" not in d, "Mongo _id leaked in /auth/me"
+        for k in ("id", "email", "name", "auth_provider", "picture", "created_at"):
+            assert k in d, f"missing {k} in /auth/me: {d}"
+        assert d["auth_provider"] == "email"
+        assert isinstance(d["created_at"], str) and d["created_at"], "created_at empty"
+        # created_at must be parseable so the UI can render 'Member since'
+        datetime.fromisoformat(d["created_at"].replace("Z", "+00:00"))
+
+    def test_google_user_me_reports_google_provider(self):
+        email = f"test_qa_gprofile_{uuid.uuid4().hex[:8]}@qa-reviewboost.com"
+        created = utcnow().isoformat()
+        uid = mdb.users.insert_one({"email": email, "name": "QA Google Profile", "auth_provider": "google",
+                                    "picture": "https://example.com/a.png", "created_at": created}).inserted_id
+        try:
+            tok = jwt.encode({"sub": str(uid), "email": email, "type": "access",
+                              "exp": utcnow() + timedelta(minutes=10)}, JWT_SECRET, algorithm="HS256")
+            h = {"Authorization": f"Bearer {tok}"}
+            d = requests.get(f"{API}/auth/me", headers=h, timeout=30).json()
+            assert d["auth_provider"] == "google", d
+            assert d["picture"] == "https://example.com/a.png"
+            assert d["created_at"] == created
+        finally:
+            b = mdb.businesses.find_one({"user_id": str(uid)})
+            if b:
+                mdb.businesses.delete_one({"_id": b["_id"]})
+            mdb.users.delete_one({"_id": uid})
+
+    def test_change_password_wrong_current_message(self, client):
+        r = client.post(f"{API}/auth/change-password",
+                        json={"current_password": "definitely-wrong-" + uuid.uuid4().hex[:6],
+                              "new_password": "SomeNewPass1!"}, timeout=30)
+        assert r.status_code == 401, r.text[:300]
+        assert "current password is incorrect" in r.json()["detail"]

@@ -61,7 +61,10 @@ def now():
 
 
 def public_user(u):
-    return {'id': str(u['_id']), 'email': u['email'], 'name': u.get('name', ''), 'onboarding_done': u.get('onboarding_done', False)}
+    return {'id': str(u['_id']), 'email': u['email'], 'name': u.get('name', ''),
+            'onboarding_done': u.get('onboarding_done', False),
+            'auth_provider': u.get('auth_provider', 'email'), 'picture': u.get('picture', ''),
+            'created_at': u.get('created_at', '')}
 
 
 def hash_password(p):

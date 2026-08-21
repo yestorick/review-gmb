@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Check, ChevronLeft, ChevronRight, Copy, Filter, MessageSquarePlus, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Copy, Filter, MessageSquarePlus, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, errText } from '../api';
+import { ReviewEditModal } from '../components/ReviewEditModal';
+import { ConfirmModal } from '../components/ConfirmModal';
 
 const shortDate = (iso) => new Date(iso).toLocaleDateString('en-GB').replaceAll('/', '-');
 const PAGE_SIZES = [10, 25, 50];
@@ -15,6 +17,7 @@ export default function Reviews() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [category, setCategory] = useState('all');
+  const [confirming, setConfirming] = useState(null);
 
   const load = async () => {
     try {
@@ -56,23 +59,13 @@ export default function Reviews() {
     }
   };
   const deleteSelected = async () => {
-    if (!window.confirm(`Delete ${selected.length} selected reviews? This cannot be undone.`)) return;
     try {
       const r = await api.post('/reviews/bulk-delete', { ids: selected });
       toast.success(`${r.data.deleted} reviews deleted`);
       load();
     } catch (x) { toast.error(errText(x)); }
   };
-  const save = async (id) => {
-    try {
-      await api.put(`/reviews/${id}`, { text: editing.text });
-      setEditing(null);
-      toast.success('Review updated');
-      load();
-    } catch (x) { toast.error(errText(x)); }
-  };
   const remove = async (id) => {
-    if (!window.confirm('Delete this review? This cannot be undone.')) return;
     try {
       await api.delete(`/reviews/${id}`);
       toast.success('Review deleted');
@@ -92,9 +85,15 @@ export default function Reviews() {
 
   return (
     <>
+      {confirming && (
+        <ConfirmModal title={confirming.kind === 'bulk' ? `Delete ${selected.length} reviews?` : 'Delete this review?'}
+          body="This cannot be undone. You can always generate fresh reviews afterwards."
+          onConfirm={confirming.kind === 'bulk' ? deleteSelected : () => remove(confirming.id)} onClose={() => setConfirming(null)} />
+      )}
+      {editing && <ReviewEditModal review={editing} onClose={() => setEditing(null)} onSaved={() => { toast.success('Review updated'); load(); }} />}
       <div className="page-head">
         <div>
-          <h1 className="page-title" data-testid="reviews-heading">Reviews List ({data?.total ?? 0})</h1>
+          <h1 className="page-title" data-testid="reviews-heading">Reviews List ({category === 'all' ? (data?.total ?? 0) : reviews.length})</h1>
           <p className="page-help">Copy any review for a customer, or share your link and let them pick one.</p>
         </div>
         <Link className="btn btn-primary" to="/reviews/new" data-testid="add-new-button"><Plus size={18} /> ADD NEW</Link>
@@ -120,8 +119,8 @@ export default function Reviews() {
       <div className="filter-row">
         <label className="filter-label"><Filter size={16} /> Show category</label>
         <select value={category} onChange={(e) => { setCategory(e.target.value); setPage(1); setSelected([]); }} data-testid="category-filter-select">
-          <option value="all">All categories ({allReviews.length})</option>
-          {categories.map((c) => <option key={c} value={c}>{c} ({allReviews.filter((r) => r.category === c).length})</option>)}
+          <option value="all">{`All categories (${allReviews.length})`}</option>
+          {categories.map((c) => <option key={c} value={c}>{`${c} (${allReviews.filter((r) => r.category === c).length})`}</option>)}
         </select>
         {category !== 'all' && <button className="text-btn" onClick={() => { setCategory('all'); setPage(1); }} data-testid="clear-filter-button">Show all</button>}
       </div>
@@ -130,7 +129,7 @@ export default function Reviews() {
         <div className="bulk-bar" data-testid="bulk-bar">
           <strong data-testid="bulk-count">{selected.length} selected</strong>
           <button className="btn btn-ghost" onClick={copySelected} data-testid="bulk-copy-button"><Copy size={16} /> Copy all</button>
-          <button className="btn btn-ghost danger" onClick={deleteSelected} data-testid="bulk-delete-button"><Trash2 size={16} /> Delete all</button>
+          <button className="btn btn-ghost danger" onClick={() => setConfirming({ kind: 'bulk' })} data-testid="bulk-delete-button"><Trash2 size={16} /> Delete all</button>
           <button className="text-btn" onClick={() => setSelected([])} data-testid="bulk-clear-button">Clear</button>
         </div>
       )}
@@ -149,32 +148,20 @@ export default function Reviews() {
                 <tbody>
                   {current.map((r, i) => (
                     <tr key={r.id} data-testid={`review-row-${i}`} className={selected.includes(r.id) ? 'row-selected' : ''}>
-                      <td><input type="checkbox" checked={selected.includes(r.id)} onChange={() => toggle(r.id)} aria-label="Select review" data-testid={`review-checkbox-${i}`} /></td>
-                      <td>{(page - 1) * pageSize + i + 1}</td>
-                      <td><span className="chip">{r.category}</span></td>
-                      <td className="review-text">
-                        {editing?.id === r.id ? (
-                          <div className="field">
-                            <textarea data-testid={`review-edit-input-${i}`} value={editing.text} onChange={(e) => setEditing({ ...editing, text: e.target.value })} />
-                            <div>
-                              <button className="btn btn-primary" onClick={() => save(r.id)} data-testid={`review-save-${i}`}><Check size={16} /> Save</button>
-                              <button className="text-btn" style={{ marginLeft: 12 }} onClick={() => setEditing(null)}>Cancel</button>
-                            </div>
-                          </div>
-                        ) : r.text}
-                      </td>
-                      <td><span className={`badge ${r.status}`} data-testid={`review-status-${i}`}>{r.status === 'used' ? 'USED' : 'AVAILABLE'}</span></td>
-                      <td>{shortDate(r.created_at)}</td>
-                      <td>
+                      <td className="cell-check"><input type="checkbox" checked={selected.includes(r.id)} onChange={() => toggle(r.id)} aria-label="Select review" data-testid={`review-checkbox-${i}`} /></td>
+                      <td className="cell-sr">{(page - 1) * pageSize + i + 1}</td>
+                      <td className="cell-cat"><span className="chip">{r.category}</span></td>
+                      <td className="review-text">{r.text}</td>
+                      <td className="cell-status"><span className={`badge ${r.status}`} data-testid={`review-status-${i}`}>{r.status === 'used' ? 'USED' : 'AVAILABLE'}</span></td>
+                      <td className="cell-date">{shortDate(r.created_at)}</td>
+                      <td className="cell-actions">
                         <div className="row-actions">
-                          <button className="icon-btn" title="Write a new one" disabled={busyId === r.id} onClick={() => regenerate(r.id)} data-testid={`review-regenerate-${i}`}>
-                            <RefreshCw size={17} className={busyId === r.id ? 'spin' : ''} />
+                          <button className="act-btn" disabled={busyId === r.id} onClick={() => regenerate(r.id)} data-testid={`review-regenerate-${i}`}>
+                            <RefreshCw size={17} className={busyId === r.id ? 'spin' : ''} /> <span>Rewrite</span>
                           </button>
-                          <button className="icon-btn" title="Copy review" onClick={() => copy(r.text, 'Review copied')} data-testid={`review-copy-${i}`}><Copy size={17} /></button>
-                          <button className="icon-btn" title="Edit" onClick={() => setEditing({ id: r.id, text: r.text })} data-testid={`review-edit-${i}`}>
-                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
-                          </button>
-                          <button className="icon-btn danger" title="Delete" onClick={() => remove(r.id)} data-testid={`review-delete-${i}`}><Trash2 size={17} /></button>
+                          <button className="act-btn" onClick={() => copy(r.text, 'Review copied')} data-testid={`review-copy-${i}`}><Copy size={17} /> <span>Copy</span></button>
+                          <button className="act-btn" onClick={() => setEditing(r)} data-testid={`review-edit-${i}`}><Pencil size={17} /> <span>Edit</span></button>
+                          <button className="act-btn danger" onClick={() => setConfirming({ kind: 'one', id: r.id })} data-testid={`review-delete-${i}`}><Trash2 size={17} /> <span>Delete</span></button>
                         </div>
                       </td>
                     </tr>

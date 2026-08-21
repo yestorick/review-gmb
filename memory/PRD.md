@@ -21,7 +21,7 @@ Owner's key direction (2026-08-20): the audience does NOT understand technology 
 - `/reviews/new` Add Reviews form: Review Category, Business Name, Business Category, Keywords, What you are known for (USP), Location, Language (English / Other + own language), Review Tone (Mixed recommended, Friendly, Storytelling, Short & Direct, Natural, Detailed), Review Style, Review Length, Service Area, How many reviews (10/15/25/40/50), Anything else
 - `/categories` Category List with add/delete
 - `/settings` My Business: name, category, location, service area, Google review link + QR/link with ACTIVE status
-- `/change-password`
+- `/profile` My Profile: login email, sign-in method, member-since, business, review link + change-password card (`/change-password` redirects here)
 - `/r/:slug` public customer page: category pill tabs, white quote cards with "Copy & Post" → copied → redirected to Google (used reviews never reappear)
 
 ## What's implemented
@@ -48,6 +48,10 @@ Owner's key direction (2026-08-20): the audience does NOT understand technology 
 
 - 2026-08-21: **Rebrand to Review Gate GMB** — owner logo used as app mark/favicon/apple-touch icon, brand lockup in the sidebar, mobile bar and auth screens, "Powered by Review Gate GMB" line on the customer page, page title, API health message and reset-email copy updated.
 - 2026-08-21: **Shorter share links** — public slugs are now 6 characters from a no-confusion alphabet (`short_slug()`), e.g. `/r/i7qfb4`. Existing businesses migrated with `/app/scripts/shorten_slugs.py` (demo owner: `i7qfb4`). When a custom domain is added, only `FRONTEND_URL` in backend/.env needs to change and links/QRs regenerate against it.
+
+- 2026-08-21: **Mobile-first UX overhaul** (testing agent iteration 8, all green): review editing moved into a popup modal (`ReviewEditModal`) on every screen size; reviews/categories tables collapse into stacked cards on mobile with labelled Rewrite/Copy/Edit/Delete buttons and zero horizontal scroll; persistent bottom tab bar (Reviews / Add New / Category / Business); "What's next?" card on My Business routing to Add Reviews so a first-time owner always knows the next step.
+- 2026-08-21: **My Profile page** replacing Change Password (testing agent iteration 9: 84/84 backend, all UI flows green) — avatar/initial, login email, sign-in method (email vs Google), member-since, business name, review link, plus the change-password card with eye toggles and inline error/success. Google accounts see a note instead of the password form. `/api/auth/me` now returns `auth_provider`, `picture`, `created_at`.
+- 2026-08-21: Polish — filter-aware Reviews heading count, profile initial from name, review link hidden until the Google link is saved, and all destructive actions (review, bulk, category) now use a styled `ConfirmModal` instead of the browser confirm dialog.
 
 ## Prioritized backlog
 - P1: Print-ready QR poster (A4/table-tent) download.
