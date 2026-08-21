@@ -172,6 +172,10 @@ td.review-text { min-width: 320px; line-height: 1.55; }
 .public-foot { text-align: center; color: var(--body); font-size: .9rem; margin-top: 26px; }
 .center-box { max-width: 420px; margin: 60px auto; background: #fff; border-radius: 20px; padding: 30px; text-align: center; box-shadow: 0 10px 30px rgba(20, 36, 58, .07); }
 
+.public-brand { display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--body); font-size: .82rem; margin: 14px 0 0; opacity: .8; }
+.brand-logo { border-radius: 9px; object-fit: contain; display: block; }
+.brand-lockup { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.05rem; letter-spacing: -.01em; white-space: nowrap; }
+.brand-lockup em { font-style: normal; color: var(--blue); }
 .loading-screen { min-height: 100vh; display: grid; place-items: center; color: var(--blue); font-weight: 600; }
 
 /* ---------- inline states, password, filter ---------- */

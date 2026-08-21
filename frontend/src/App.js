@@ -15,6 +15,7 @@ import Settings from './pages/Settings';
 import ChangePassword from './pages/ChangePassword';
 import PublicReview from './pages/PublicReview';
 import './styles.css';
+import { BrandLockup } from './components/Logo';
 
 function Shell({ user, setUser, children }) {
   const [open, setOpen] = useState(false);
@@ -30,7 +31,7 @@ function Shell({ user, setUser, children }) {
       {open && <div className="scrim" onClick={() => setOpen(false)} />}
       <main className="main">
         <div className="mobile-bar">
-          <span className="sidebar-brand" style={{ border: 'none', padding: 0 }}><span className="brand-mark">R</span> ReviewBoost</span>
+          <BrandLockup size={30} />
           <button className="icon-btn" onClick={() => setOpen(true)} data-testid="open-sidebar-button"><Menu size={22} /></button>
         </div>
         {children}
@@ -52,7 +53,7 @@ function Router() {
 
   if (returningFromGoogle) return <AuthCallback setUser={setUser} />;
 
-  const loading = <div className="loading-screen">ReviewBoost</div>;
+  const loading = <div className="loading-screen">Review Gate GMB</div>;
   const owner = (element) => (checking ? loading : user ? <Shell user={user} setUser={setUser}>{element}</Shell> : <Navigate to="/" replace />);
 
   return (

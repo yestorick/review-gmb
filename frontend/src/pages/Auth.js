@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { api, errText } from '../api';
 import { PasswordInput } from '../components/PasswordInput';
+import { Logo, BrandLockup } from '../components/Logo';
 
 // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
 const googleSignIn = () => {
@@ -41,7 +42,7 @@ export default function Auth({ setUser }) {
   return (
     <main className="auth-page">
       <div className="auth-card" data-testid="auth-card">
-        <span className="brand-mark">R</span>
+        <BrandLockup size={40} />
         {mode === 'forgot' ? (
           <>
             <h1>Forgot your password?</h1>

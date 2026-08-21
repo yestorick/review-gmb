@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CheckCircle2 } from 'lucide-react';
 import { api, errText } from '../api';
 import { PasswordInput } from '../components/PasswordInput';
+import { Logo } from '../components/Logo';
 
 export default function ResetPassword({ setUser }) {
   const [params] = useSearchParams();
@@ -28,7 +29,7 @@ export default function ResetPassword({ setUser }) {
   return (
     <main className="auth-page">
       <div className="auth-card" data-testid="reset-card">
-        <span className="brand-mark">R</span>
+        <Logo size={44} />
         <h1>Set a new password</h1>
         <p className="sub">Choose something you will remember. At least 8 characters.</p>
         {done ? (

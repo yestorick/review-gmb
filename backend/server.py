@@ -20,7 +20,7 @@ from emergentintegrations.llm.chat import LlmChat, UserMessage
 
 client = AsyncIOMotorClient(os.environ['MONGO_URL'])
 db = client[os.environ['DB_NAME']]
-app = FastAPI(title='ReviewBoost API')
+app = FastAPI(title='Review Gate GMB API')
 api = APIRouter(prefix='/api')
 JWT_ALGORITHM = 'HS256'
 GOOGLE_HOSTS = ('g.page', 'g.co', 'goo.gl', 'maps.app.goo.gl', 'share.google', 'maps.google.com', 'search.google.com', 'business.google.com', 'www.google.com', 'google.com')
@@ -48,7 +48,12 @@ WORD_LIMITS = ['15-25 Words', '25-40 Words', '40-50 Words', '50-70 Words']
 COUNTS = [10, 15, 25, 40, 50]
 @api.get('/')
 async def health():
-    return {'message': 'ReviewBoost API is ready'}
+    return {'message': 'Review Gate GMB API is ready'}
+
+
+def short_slug() -> str:
+    alphabet = 'abcdefghijkmnpqrstuvwxyz23456789'
+    return ''.join(secrets.choice(alphabet) for _ in range(6))
 
 
 def now():
@@ -101,7 +106,7 @@ async def owner_business(user, create=False):
     if not b and create:
         b = {'id': str(uuid.uuid4()), 'user_id': str(user['_id']), 'name': '', 'business_category': '', 'location': '',
              'service_area': '', 'keywords': '', 'usp': '', 'google_review_url': '',
-             'public_slug': secrets.token_urlsafe(10).replace('-', '_'), 'lifetime_used': 0, 'created_at': now()}
+             'public_slug': short_slug(), 'lifetime_used': 0, 'created_at': now()}
         await db.businesses.insert_one(dict(b))
         b.pop('_id', None)
     return b
@@ -183,13 +188,13 @@ def send_reset_email(email: str, token: str) -> bool:
     resend.api_key = api_key
     link = f'{FRONTEND_URL}/reset-password?token={token}'
     html = f"""<div style="font-family:Arial,Helvetica,sans-serif;color:#14243a">
-      <h2 style="color:#1d7cf5">Reset your ReviewBoost password</h2>
+      <h2 style="color:#1d6ff2">Reset your Review Gate GMB password</h2>
       <p>Tap the button below to choose a new password. This link works for one hour.</p>
-      <p><a href="{link}" style="background:#1d7cf5;color:#fff;padding:12px 22px;border-radius:8px;text-decoration:none;display:inline-block">Choose a new password</a></p>
+      <p><a href="{link}" style="background:#1d6ff2;color:#fff;padding:12px 22px;border-radius:8px;text-decoration:none;display:inline-block">Choose a new password</a></p>
       <p style="font-size:13px;color:#4b5b6f">If you did not ask for this, you can ignore this email.</p>
     </div>"""
     resend.Emails.send({'from': os.environ.get('SENDER_EMAIL', 'onboarding@resend.dev'), 'to': [email],
-                        'subject': 'Reset your ReviewBoost password', 'html': html})
+                        'subject': 'Reset your Review Gate GMB password', 'html': html})
     return True
 
 

@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { ClipboardCheck, Quote } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../api';
+import { Logo } from '../components/Logo';
 
 export default function PublicReview() {
   const { slug } = useParams();
@@ -39,7 +40,7 @@ export default function PublicReview() {
   if (data === false) {
     return (
       <div className="public-page">
-        <div className="center-box"><span className="brand-mark">R</span><h1>Link not found</h1><p>This review link may be mistyped or not set up yet.</p></div>
+        <div className="center-box"><Logo size={44} /><h1>Link not found</h1><p>This review link may be mistyped or not set up yet.</p></div>
       </div>
     );
   }
@@ -88,6 +89,7 @@ export default function PublicReview() {
         )}
 
         <p className="public-foot">After tapping, just paste it on Google and hit post. Takes 5 seconds.</p>
+        <p className="public-brand"><Logo size={20} /> Powered by Review Gate GMB</p>
       </div>
     </div>
   );

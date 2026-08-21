@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { KeyRound, LayoutList, LogOut, Settings, Shapes, X } from 'lucide-react';
+import { BrandLockup } from './Logo';
 
 const items = [
   { to: '/reviews', label: 'Reviews', icon: LayoutList, testid: 'nav-reviews' },
@@ -11,7 +12,7 @@ const items = [
 export const Sidebar = ({ open, close, onLogout }) => (
   <aside className={`sidebar${open ? ' open' : ''}`} data-testid="sidebar">
     <div className="sidebar-brand">
-      <span className="brand-mark">R</span> ReviewBoost
+      <BrandLockup />
       <button className="icon-btn sidebar-close" style={{ marginLeft: 'auto' }} onClick={close} data-testid="close-sidebar-button">
         <X size={18} />
       </button>

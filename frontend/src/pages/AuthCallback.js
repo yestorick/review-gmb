@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, errText } from '../api';
+import { Logo } from '../components/Logo';
 
 export default function AuthCallback({ setUser }) {
   const done = useRef(false);
@@ -24,7 +25,7 @@ export default function AuthCallback({ setUser }) {
     return (
       <div className="auth-page">
         <div className="auth-card" data-testid="google-callback-error">
-          <span className="brand-mark">R</span>
+          <Logo size={44} />
           <h1>Google sign-in did not work</h1>
           <p className="sub">{error}</p>
           <a className="btn btn-primary" href="/" style={{ justifyContent: 'center' }}>Back to sign in</a>

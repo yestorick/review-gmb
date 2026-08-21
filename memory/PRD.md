@@ -1,4 +1,6 @@
-# ReviewBoost Product Record
+# Review Gate GMB — Product Record
+
+**App name: Review Gate GMB** (was ReviewBoost until 2026-08-21). Logo: `/app/frontend/public/logo.png` (+ favicon.png, logo-192, logo-512); brand components in `src/components/Logo.js` (`Logo`, `BrandLockup`).
 
 ## Original problem statement
 A free, mobile-first web app for local business owners (non-technical, e.g. small clinics, salons, shops) to get more Google reviews. The owner fills a simple form (category, business details, keywords, tone, style, length, how many reviews) and the app writes ready-made reviews. The owner shares a QR/link; the customer opens `/r/{slug}`, taps a review, it is copied and they are sent to the real Google review page. No reviewer login, no payments, no reviewer PII.
@@ -43,6 +45,9 @@ Owner's key direction (2026-08-20): the audience does NOT understand technology 
   8. **Used reviews vanish**: the public page serves only `status=available` drafts (no fallback), `use` is a single atomic `find_one_and_update` so two customers can never post the same review (409 on race), and an "All reviews are taken right now" state shows when the library is empty.
 - 2026-08-20: Post-review hardening — login lockout (429 after 8 wrong tries/15 min), 404 vs 409 semantics on public use, reset-token invalidation + indexes, friendlier filtered-empty copy. Resend key configured and a real reset email delivered successfully.
 - 2026-08-20: **Customer page redesign** (reference-inspired): soft grey gradient background, pill category tabs ("All Reviews" + each category, dark navy active state, horizontal scroll), white 20px-radius quote cards with a blue quote mark, staggered entrance animation and a blue pill "Copy & Post" button per card. Public payload now returns up to 40 available drafts plus the category list. Verified end-to-end on mobile: tap → copy → redirect to Google and the used review is gone on reload.
+
+- 2026-08-21: **Rebrand to Review Gate GMB** — owner logo used as app mark/favicon/apple-touch icon, brand lockup in the sidebar, mobile bar and auth screens, "Powered by Review Gate GMB" line on the customer page, page title, API health message and reset-email copy updated.
+- 2026-08-21: **Shorter share links** — public slugs are now 6 characters from a no-confusion alphabet (`short_slug()`), e.g. `/r/i7qfb4`. Existing businesses migrated with `/app/scripts/shorten_slugs.py` (demo owner: `i7qfb4`). When a custom domain is added, only `FRONTEND_URL` in backend/.env needs to change and links/QRs regenerate against it.
 
 ## Prioritized backlog
 - P1: Print-ready QR poster (A4/table-tent) download.
