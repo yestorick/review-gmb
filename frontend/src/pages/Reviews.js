@@ -1,12 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Copy, Filter, MessageSquarePlus, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Copy, ExternalLink, Filter, Link2, MessageSquarePlus, Pencil, Plus, QrCode, RefreshCw, Share2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, errText } from '../api';
 import { ReviewEditModal } from '../components/ReviewEditModal';
 import { ConfirmModal } from '../components/ConfirmModal';
 
 const shortDate = (iso) => new Date(iso).toLocaleDateString('en-GB').replaceAll('/', '-');
+const splitLink = (url) => {
+  const bare = url.replace(/^https?:\/\//, '');
+  const at = bare.indexOf('/r/');
+  return { host: at > -1 ? bare.slice(0, at) : bare, path: at > -1 ? bare.slice(at) : '' };
+};
 const PAGE_SIZES = [10, 25, 50];
 
 export default function Reviews() {
@@ -48,6 +53,15 @@ export default function Reviews() {
     } catch {
       toast.message('Copy it from here', { description: text });
     }
+  };
+  const share = async (url) => {
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'Leave us a review', text: 'Pick a ready-made review and post it in one tap', url });
+        return;
+      } catch { /* cancelled */ }
+    }
+    copy(url, 'Link copied — paste it anywhere');
   };
   const copySelected = async () => {
     const texts = reviews.filter((r) => selected.includes(r.id)).map((r) => r.text).join('\n\n');
@@ -91,30 +105,44 @@ export default function Reviews() {
           onConfirm={confirming.kind === 'bulk' ? deleteSelected : () => remove(confirming.id)} onClose={() => setConfirming(null)} />
       )}
       {editing && <ReviewEditModal review={editing} onClose={() => setEditing(null)} onSaved={() => { toast.success('Review updated'); load(); }} />}
-      <div className="page-head">
-        <div>
-          <h1 className="page-title" data-testid="reviews-heading">Reviews List ({category === 'all' ? (data?.total ?? 0) : reviews.length})</h1>
-          <p className="page-help">Copy any review for a customer, or share your link and let them pick one.</p>
+      <section className="hero-card">
+        <div className="hero-top">
+          <div>
+            <h1 className="hero-title" data-testid="reviews-heading">
+              Reviews <span className="count-badge">{category === 'all' ? (data?.total ?? 0) : reviews.length}</span>
+            </h1>
+            <p className="hero-sub">Share your link or QR — customers tap a review and post it on Google.</p>
+          </div>
+          <Link className="btn btn-primary" to="/reviews/new" data-testid="add-new-button"><Plus size={18} /> Add new</Link>
         </div>
-        <Link className="btn btn-primary" to="/reviews/new" data-testid="add-new-button"><Plus size={18} /> ADD NEW</Link>
-      </div>
 
-      {b && (
-        <div className="link-banner">
-          <span>Your review link:</span>
-          <a href={b.public_url} target="_blank" rel="noreferrer" data-testid="public-link">{b.public_url}</a>
-          <button className="icon-btn" onClick={() => copy(b.public_url, 'Link copied')} data-testid="copy-link-button"><Copy size={18} /></button>
-          {b.is_active
-            ? <span className="status-pill on" data-testid="link-status">ACTIVE</span>
-            : <Link to="/settings" className="status-pill off" data-testid="link-status">ADD GOOGLE LINK</Link>}
+        {b && (
+          <div className="share-box">
+            <div className="share-head">
+              <span className="share-label"><Link2 size={15} /> Your review link</span>
+              {b.is_active
+                ? <span className="dot-pill on" data-testid="link-status"><i />Active</span>
+                : <Link to="/settings" className="dot-pill off" data-testid="link-status"><i />Add Google link</Link>}
+            </div>
+            <a className="link-chip" href={b.public_url} target="_blank" rel="noreferrer" data-testid="public-link">
+              <span className="link-host">{splitLink(b.public_url).host}</span>
+              <span className="link-path">{splitLink(b.public_url).path}</span>
+              <ExternalLink size={15} />
+            </a>
+            <div className="share-actions">
+              <button className="chip-btn" onClick={() => copy(b.public_url, 'Link copied')} data-testid="copy-link-button"><Copy size={16} /> Copy link</button>
+              <button className="chip-btn" onClick={() => share(b.public_url)} data-testid="share-link-button"><Share2 size={16} /> Share</button>
+              <Link className="chip-btn" to="/settings" data-testid="qr-link-button"><QrCode size={16} /> QR code</Link>
+            </div>
+          </div>
+        )}
+
+        <div className="metric-row">
+          <div className="metric"><b data-testid="stat-total">{data?.total ?? 0}</b><span>Total</span></div>
+          <div className="metric ok"><b data-testid="stat-available">{data?.available ?? 0}</b><span>Ready to use</span></div>
+          <div className="metric used"><b data-testid="stat-used">{data?.used ?? 0}</b><span>Posted</span></div>
         </div>
-      )}
-
-      <div className="stat-row">
-        <div className="stat"><b data-testid="stat-total">{data?.total ?? 0}</b><span>Total reviews</span></div>
-        <div className="stat"><b data-testid="stat-available">{data?.available ?? 0}</b><span>Available</span></div>
-        <div className="stat"><b data-testid="stat-used">{data?.used ?? 0}</b><span>Used by customers</span></div>
-      </div>
+      </section>
 
       <div className="filter-row">
         <label className="filter-label"><Filter size={16} /> Show category</label>

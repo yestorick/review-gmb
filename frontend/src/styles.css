@@ -211,6 +211,49 @@ td.review-text { min-width: 320px; line-height: 1.55; }
 .brand-lockup em { font-style: normal; color: var(--blue); }
 .loading-screen { min-height: 100vh; display: grid; place-items: center; color: var(--blue); font-weight: 600; }
 
+/* ---------- reviews hero ---------- */
+.hero-card {
+  background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 22px 24px;
+  margin-bottom: 18px; box-shadow: 0 6px 22px rgba(20, 36, 58, .05);
+}
+.hero-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; flex-wrap: wrap; }
+.hero-title { margin: 0; font-size: 1.35rem; display: flex; align-items: center; gap: 10px; }
+.count-badge { background: #eaf3ff; color: var(--blue); font-size: .85rem; font-weight: 700; padding: 4px 11px; border-radius: 999px; }
+.hero-sub { margin: 6px 0 0; color: var(--body); font-size: .92rem; line-height: 1.5; }
+
+.share-box { margin-top: 20px; background: #f7f9fd; border: 1px solid #e7edf6; border-radius: 14px; padding: 16px; }
+.share-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.share-label { display: flex; align-items: center; gap: 7px; font-size: .82rem; font-weight: 600; color: var(--body); text-transform: uppercase; letter-spacing: .05em; }
+.dot-pill { display: inline-flex; align-items: center; gap: 7px; font-size: .78rem; font-weight: 700; padding: 5px 12px; border-radius: 999px; text-decoration: none; }
+.dot-pill i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.dot-pill.on { background: #e6f6ec; color: var(--green); }
+.dot-pill.off { background: #fdf3e0; color: var(--amber); }
+.link-chip {
+  display: flex; align-items: center; gap: 10px; background: #fff; border: 1px solid var(--line);
+  border-radius: 10px; padding: 12px 14px; text-decoration: none; color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .88rem;
+  transition: border-color .18s ease, box-shadow .18s ease;
+}
+.link-chip:hover { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(29, 111, 242, .1); }
+.link-chip svg { flex: none; color: var(--blue); }
+.link-host { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--body); }
+.link-path { flex: none; font-weight: 700; color: var(--ink); }
+.share-actions { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+.chip-btn {
+  display: inline-flex; align-items: center; gap: 8px; background: #fff; border: 1px solid var(--line);
+  border-radius: 999px; padding: 9px 16px; font-size: .88rem; font-weight: 600; color: var(--ink); text-decoration: none;
+  transition: border-color .18s ease, color .18s ease, transform .12s ease;
+}
+.chip-btn:hover { border-color: var(--blue); color: var(--blue); transform: translateY(-1px); }
+
+.metric-row { display: flex; gap: 12px; margin-top: 18px; }
+.metric { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.metric b { display: block; font-size: 1.35rem; line-height: 1.2; }
+.metric span { color: var(--body); font-size: .8rem; }
+.metric.ok { background: #f3fbf6; border-color: #d8eee1; }
+.metric.ok b { color: var(--green); }
+.metric.used { background: #f8f9fc; }
+
 /* ---------- inline states, password, filter ---------- */
 .inline-error, .inline-success {
   display: flex; align-items: flex-start; gap: 8px; font-size: .89rem; line-height: 1.5;
@@ -350,6 +393,16 @@ thead th input[type="checkbox"], tbody td input[type="checkbox"] { width: 17px; 
     padding: 14px 0; position: sticky; top: 0; background: var(--bg); z-index: 20;
   }
   .form-grid { grid-template-columns: 1fr; }
+  .hero-card { padding: 18px 16px; border-radius: 16px; }
+  .hero-top { flex-direction: column; align-items: stretch; gap: 14px; }
+  .hero-top .btn { justify-content: center; }
+  .hero-title { font-size: 1.2rem; }
+  .metric-row { gap: 8px; }
+  .metric { padding: 10px 11px; }
+  .metric b { font-size: 1.15rem; }
+  .metric span { font-size: .72rem; }
+  .share-actions .chip-btn { flex: 1; justify-content: center; white-space: nowrap; padding: 9px 10px; font-size: .84rem; }
+  .link-chip { font-size: .82rem; padding: 11px 12px; gap: 6px; }
   .stat { flex: 1 1 100px; min-width: 0; padding: 12px 14px; }
   .stat b { font-size: 1.25rem; }
   .pager { justify-content: space-between; }
