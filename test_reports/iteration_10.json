@@ -1,0 +1,32 @@
+{
+  "summary": "Frontend-only retest of the Reviews page QR popup + labelled share chips (mobile 390x844 and desktop 1600x900), plus full Reviews-page regression. All functional acceptance criteria PASS: mobile chips show icon + label under it ('Copy link' / 'Share' / 'QR code'), no horizontal scroll (scrollWidth=390), QR popup shows heading + QR image + business-name caption + full-width 'Download QR' button entirely inside the viewport (button bottom 577 < 844, modal 197-647, no internal scroll: scrollHeight==clientHeight==451), no URL text inside popup, download href is a valid data:image/png;base64 URL with download=review-qr.png and an actual download event fires with suggested_filename=review-qr.png, X and backdrop both close and reopening re-renders the QR. Regression: hero stats 23/7/16, Add new reviews -> /reviews/new, category filter + Show all, edit modal saves and persists, delete confirm modal cancel works, pagination Page 1->2->1, first review row visible on load on mobile. ONE DESIGN DEFECT FOUND: the compact/centred QR modal CSS is being overridden, so the popup is 420px wide (not 340) with left-aligned content on desktop and a left-hugging QR block on mobile.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Reviews -> QR popup (both mobile and desktop)", "issues": [
+        "The .qr-modal rule (styles.css line 257: max-width 340px; text-align center; padding 22px) is declared BEFORE the generic .modal rule (line 317: max-width 420px; text-align left; padding 28px). Same specificity, so the later .modal rule wins: computed values are max-width 420px, padding 28px, text-align left.",
+        "Result on desktop 1600x900: popup is 420px wide and the 198px QR frame sits flush left (frame 618-816 inside content box 618-982) leaving ~166px of empty white space on its right — visibly lopsided; heading and hint text are also left-aligned instead of centred.",
+        "Result on mobile 390: same left-hugging QR frame (frame 48-246 inside content 48-342, ~96px gap on the right). Functionally fine, but not the compact centred design described in the fix."
+      ]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Fix CSS ordering/specificity so the QR popup actually gets max-width 340px, padding 22px and text-align center — either move the .qr-modal block AFTER the generic .modal block in /app/frontend/src/styles.css, or raise specificity (e.g. .modal.qr-modal { ... }). Then the QR frame, heading and hint will centre and the popup will be the intended compact 340px."
+  ],
+  "critical_code_review_comments": [
+    "styles.css: component-specific overrides (.qr-modal) placed above the base component rule (.modal) is fragile — keep base rules first or use .modal.qr-modal for intent-safe overrides.",
+    "QrModal.js: the download anchor href falls back to '#' while the QR is loading; consider disabling/aria-disabled the button until qr is set to avoid a no-op tap.",
+    "QrModal.js: api failure only shows a toast and leaves the shimmer skeleton forever — add a visible retry/error state inside the popup."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "not tested (frontend-only iteration)", "frontend": "100% functional, 1 design issue"},
+  "seed_data_creation": "None. Temporarily appended ' QA10' to review row 0 to verify edit persistence, then reverted it in the same run.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "owner@reviewboost.demo / ReviewBoost123! (worked)",
+  "context_for_next_testing_agent": "QR popup functionality (compact height, download, close paths, no URL text) and mobile labelled chips are verified good on both 390x844 and 1600x900. qr-modal-url no longer exists by design. Only open item is the .qr-modal vs .modal CSS override (width/centring). Reviews page regression suite (hero stats, filter, edit, delete, pagination, add-new nav) all passed on 2026-08-21.",
+  "rca_of_the_issue": "Cascade order bug: .qr-modal { max-width:340px; text-align:center; padding:22px } is defined at styles.css:257 while the base .modal { max-width:420px; text-align:left; padding:28px } is defined later at :317. Equal (single-class) specificity means the later declaration wins, so all three intended compact-modal properties are silently discarded. Reproduce: open Reviews -> QR code, inspect .qr-modal computed style (420px / left / 28px)."
+}

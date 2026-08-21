@@ -254,18 +254,21 @@ td.review-text { min-width: 320px; line-height: 1.55; }
 .metric.ok b { color: var(--green); }
 .metric.used { background: #f8f9fc; }
 
-.qr-modal { max-width: 400px; text-align: center; }
-.qr-modal h2 { margin: 4px 0 8px; }
+.modal.qr-modal { max-width: 340px; text-align: center; padding: 22px; }
+.modal.qr-modal h2 { margin: 0 0 4px; font-size: 1.12rem; }
 .qr-frame {
-  margin: 20px auto 12px; background: #fff; border: 1px solid var(--line); border-radius: 18px;
-  padding: 18px; display: inline-flex; flex-direction: column; align-items: center; gap: 12px;
-  box-shadow: 0 10px 26px rgba(20, 36, 58, .08);
+  margin: 14px auto 16px; background: #fff; border: 1px solid var(--line); border-radius: 16px;
+  padding: 14px; display: inline-flex; flex-direction: column; align-items: center; gap: 8px;
+  box-shadow: 0 8px 20px rgba(20, 36, 58, .08);
 }
+.qr-download { width: 100%; justify-content: center; }
+.qr-download.disabled { opacity: .6; pointer-events: none; }
+.qr-hint { color: var(--body); font-size: .82rem; line-height: 1.5; margin: 12px 0 0; }
 .qr-frame img { display: block; }
-.qr-skeleton { width: 220px; height: 220px; border-radius: 12px; background: linear-gradient(100deg, #eef2f8, #f8fafd, #eef2f8); animation: shimmer 1.2s linear infinite; }
+.qr-skeleton { width: 168px; height: 168px; border-radius: 12px; background: linear-gradient(100deg, #eef2f8, #f8fafd, #eef2f8); animation: shimmer 1.2s linear infinite; }
 @keyframes shimmer { from { background-position: -200px 0; } to { background-position: 200px 0; } }
-.qr-caption { font-weight: 700; font-size: .95rem; max-width: 220px; }
-.qr-url { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .82rem; color: var(--body); overflow-wrap: anywhere; margin: 0; }
+.qr-caption { font-weight: 700; font-size: .88rem; max-width: 168px; }
+
 
 /* ---------- inline states, password, filter ---------- */
 .inline-error, .inline-success {
@@ -415,8 +418,7 @@ thead th input[type="checkbox"], tbody td input[type="checkbox"] { width: 17px; 
   .share-head { margin-bottom: 8px; }
   .share-label { font-size: .72rem; }
   .share-actions { gap: 8px; margin-top: 10px; }
-  .share-actions .chip-btn span { display: none; }
-  .share-actions .chip-btn { padding: 10px 0; }
+  .share-actions .chip-btn { flex-direction: column; gap: 5px; padding: 10px 4px; border-radius: 12px; font-size: .76rem; }
   .metric-row { gap: 8px; margin-top: 12px; }
   .metric { display: flex; align-items: baseline; gap: 6px; padding: 8px 10px; border-radius: 10px; }
   .metric b { font-size: 1rem; }

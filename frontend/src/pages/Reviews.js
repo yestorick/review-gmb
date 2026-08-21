@@ -101,7 +101,7 @@ export default function Reviews() {
 
   return (
     <>
-      {showQr && b && <QrModal slug={b.public_slug} publicUrl={b.public_url} businessName={b.name} onClose={() => setShowQr(false)} />}
+      {showQr && b && <QrModal slug={b.public_slug} businessName={b.name} onClose={() => setShowQr(false)} />}
       {confirming && (
         <ConfirmModal title={confirming.kind === 'bulk' ? `Delete ${selected.length} reviews?` : 'Delete this review?'}
           body="This cannot be undone. You can always generate fresh reviews afterwards."
