@@ -55,6 +55,11 @@ export default function Auth({ setUser }) {
           </>
         )}
 
+        <div className="beta-note" data-testid="beta-notice">
+          <strong>🎉 We&apos;re in Beta!</strong>
+          <span>Review Gate GMB is free to use while we test and improve it. Sign up, explore, use it, and share your feedback — it helps us build something better.</span>
+        </div>
+
         {sent ? (
           <div className="inline-success" data-testid="forgot-success"><CheckCircle2 size={18} /> <span>{sent}</span></div>
         ) : (
