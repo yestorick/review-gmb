@@ -545,7 +545,11 @@ async def qr(slug: str):
 
 
 app.include_router(api)
-app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=[FRONTEND_URL], allow_methods=['*'], allow_headers=['*'])
+cors_origins = [o.strip() for o in os.environ['CORS_ORIGINS'].split(',') if o.strip()]
+if '*' in cors_origins:
+    app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origin_regex='.*', allow_methods=['*'], allow_headers=['*'])
+else:
+    app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=sorted({*cors_origins, FRONTEND_URL}), allow_methods=['*'], allow_headers=['*'])
 
 
 @app.on_event('startup')
