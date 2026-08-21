@@ -51,7 +51,7 @@ export default function Auth({ setUser }) {
         ) : (
           <>
             <h1>{mode === 'login' ? 'Welcome back' : 'Create your free account'}</h1>
-            <p className="sub">Ready-made Google reviews for your shop. No tech skills needed.</p>
+            <p className="sub">Ready-made Google reviews for your business. No tech skills needed.</p>
           </>
         )}
 

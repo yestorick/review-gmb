@@ -74,7 +74,7 @@ export default function Settings() {
           </div>
           <div className="field full">
             <label>Google Review Link<span className="hint">Open your Google listing, tap Reviews, then "Get more reviews" and copy that link</span></label>
-            <input value={form.google_review_url} onChange={set('google_review_url')} disabled={!editing} placeholder="https://g.page/your-shop/review" data-testid="settings-google-url-input" />
+            <input value={form.google_review_url} onChange={set('google_review_url')} disabled={!editing} placeholder="https://g.page/your-business/review" data-testid="settings-google-url-input" />
           </div>
         </div>
         {error && <div className="inline-error" data-testid="settings-error">{error}</div>}
