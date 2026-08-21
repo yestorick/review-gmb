@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Sparkles } from 'lucide-react';
+import { ArrowLeft, Plus, Sparkles, Wand2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, errText } from '../api';
 import { CategoryModal } from '../components/CategoryModal';
@@ -18,7 +18,7 @@ export default function AddReview() {
   const [form, setForm] = useState({
     category: '', business_name: '', business_category: '', keywords: '', usp: '', location: '',
     language: 'English', customLanguage: '', tone: 'Mixed (recommended)', style: 'Detailed',
-    word_limit: '40-50 Words', count: 15, service_area: '', other_suggestion: '',
+    word_limit: '40-50 Words', count: 15, service_area: '', other_suggestion: '', humanize: false,
   });
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
@@ -114,21 +114,31 @@ export default function AddReview() {
               <input required value={form.customLanguage} onChange={set('customLanguage')} placeholder="Type the language" data-testid="custom-language-input" />
             </div>
           ) : <div className="field" />}
+          <div className="field full">
+            <button type="button" className={`humanize-card${form.humanize ? ' on' : ''}`} onClick={() => setForm({ ...form, humanize: !form.humanize })} data-testid="humanize-toggle">
+              <span className="humanize-icon"><Wand2 size={20} /></span>
+              <span className="humanize-copy">
+                <strong>Humanize <em>(recommended)</em></strong>
+                <span>Write like a real customer typing on their phone — simple words, short lines, one small real detail, no marketing talk.</span>
+              </span>
+              <span className={`switch${form.humanize ? ' on' : ''}`} aria-hidden="true"><i /></span>
+            </button>
+          </div>
           <div className="field">
-            <label>Review Tone <span className="req">*</span></label>
-            <select value={form.tone} onChange={set('tone')} data-testid="tone-select">
+            <label>Review Tone <span className="req">*</span>{form.humanize && <span className="hint">Handled by Humanize</span>}</label>
+            <select value={form.tone} onChange={set('tone')} disabled={form.humanize} data-testid="tone-select">
               {TONES.map((t) => <option key={t}>{t}</option>)}
             </select>
           </div>
           <div className="field">
-            <label>Review Style <span className="req">*</span></label>
-            <select value={form.style} onChange={set('style')} data-testid="style-select">
+            <label>Review Style <span className="req">*</span>{form.humanize && <span className="hint">Handled by Humanize</span>}</label>
+            <select value={form.style} onChange={set('style')} disabled={form.humanize} data-testid="style-select">
               {STYLES.map((t) => <option key={t}>{t}</option>)}
             </select>
           </div>
           <div className="field">
-            <label>Review Length <span className="req">*</span></label>
-            <select value={form.word_limit} onChange={set('word_limit')} data-testid="word-limit-select">
+            <label>Review Length <span className="req">*</span>{form.humanize && <span className="hint">Mixed lengths</span>}</label>
+            <select value={form.word_limit} onChange={set('word_limit')} disabled={form.humanize} data-testid="word-limit-select">
               {WORD_LIMITS.map((t) => <option key={t}>{t}</option>)}
             </select>
           </div>

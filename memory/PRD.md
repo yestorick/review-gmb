@@ -53,6 +53,8 @@ Owner's key direction (2026-08-20): the audience does NOT understand technology 
 - 2026-08-21: **My Profile page** replacing Change Password (testing agent iteration 9: 84/84 backend, all UI flows green) — avatar/initial, login email, sign-in method (email vs Google), member-since, business name, review link, plus the change-password card with eye toggles and inline error/success. Google accounts see a note instead of the password form. `/api/auth/me` now returns `auth_provider`, `picture`, `created_at`.
 - 2026-08-21: Polish — filter-aware Reviews heading count, profile initial from name, review link hidden until the Google link is saved, and all destructive actions (review, bulk, category) now use a styled `ConfirmModal` instead of the browser confirm dialog.
 
+- 2026-08-21: **Humanize option** on Add Reviews — a prominent toggle (default off, marked recommended) that switches generation to a real-Indian-customer voice: simple everyday words, no salesy adjectives, varied openings and lengths, one small specific human detail per review, light Indian English rhythm, single specific praise, keywords only where natural (about half the batch) and strictly one language/script. Tone/Style/Length selects grey out while it is on (`humanize` flag on `POST /api/reviews/generate`, `HUMANIZE_RULES` in server.py). Verified with two live 10-review batches: varied openings, real details (wait times, staff name, day/time), no non-Latin script leakage, no keyword stuffing.
+
 ## Prioritized backlog
 - P1: Print-ready QR poster (A4/table-tent) download.
 - P2: Duplicate/similarity warning across a large review library.

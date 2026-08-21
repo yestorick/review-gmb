@@ -257,6 +257,25 @@ thead th input[type="checkbox"], tbody td input[type="checkbox"] { width: 17px; 
 .modal h2 { font-size: 1.2rem; margin: 14px 0 8px; }
 .modal p { color: var(--body); margin: 0; line-height: 1.6; }
 .btn-danger { background: #d93025; color: #fff; box-shadow: 0 6px 16px rgba(217, 48, 37, .25); }
+
+/* ---------- humanize toggle ---------- */
+.humanize-card {
+  display: flex; align-items: center; gap: 16px; width: 100%; text-align: left;
+  background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px;
+  transition: border-color .2s ease, background-color .2s ease, box-shadow .2s ease;
+}
+.humanize-card:hover { border-color: #bcd8fb; }
+.humanize-card.on { border-color: var(--blue); background: linear-gradient(180deg, #f5faff, #fff); box-shadow: 0 8px 22px rgba(29, 111, 242, .12); }
+.humanize-icon { flex: none; width: 42px; height: 42px; border-radius: 12px; background: #eaf3ff; color: var(--blue); display: grid; place-items: center; }
+.humanize-copy { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
+.humanize-copy strong { font-size: .98rem; }
+.humanize-copy em { font-style: normal; color: var(--blue); font-weight: 600; font-size: .85rem; }
+.humanize-copy span { color: var(--body); font-size: .87rem; line-height: 1.5; }
+.switch { flex: none; width: 46px; height: 26px; border-radius: 999px; background: #dde5ef; position: relative; transition: background-color .2s ease; }
+.switch i { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.2); transition: transform .2s ease; }
+.switch.on { background: var(--blue); }
+.switch.on i { transform: translateX(20px); }
+.field select:disabled { background: #f5f7fa; color: var(--body); cursor: not-allowed; }
 .btn-danger:hover { background: #b3261e; }
 .modal-icon.danger { background: #fdecea; color: #d93025; }
 .modal-icon { width: 48px; height: 48px; border-radius: 14px; background: #eaf3ff; color: var(--blue); display: grid; place-items: center; }

@@ -160,6 +160,7 @@ class GenerateIn(BaseModel):
     count: int = 15
     service_area: str = Field(default='', max_length=120)
     other_suggestion: str = Field(default='', max_length=600)
+    humanize: bool = False
 
 
 class ReviewIn(BaseModel):
@@ -359,7 +360,37 @@ async def delete_category(category_id: str, u=Depends(current_user)):
     return {'ok': True}
 
 
+HUMANIZE_RULES = """Write in the voice of a real, everyday Indian customer typing a quick review on their phone. Not a marketer, not a copywriter.
+Rules:
+1. Simple everyday words only. No corporate or salesy language (never use words like exceptional, seamless, phenomenal, top-notch, highly recommend to everyone).
+2. Keep sentences short. Mix short and slightly longer sentences like real speech, not a polished paragraph.
+3. Vary the opening of every review. Never start two reviews the same way (no repeated "I recently visited" or "Amazing experience").
+4. Include one small specific human detail in each review (a staff name, a wait time, what they bought, the day or time). Keep it plausible for this business.
+5. Light imperfection is fine: mild casualness, a repeated word, an incomplete sentence here and there.
+6. Where natural, allow a light Indian English rhythm (for example "very good service only", "staff is also very cooperative") without overdoing it or making it a caricature.
+7. Vary length: some reviews 1-2 lines, some 3-4 lines. Not every review is a full paragraph.
+8. Never reuse the same phrase, compliment or sentence structure across reviews for this business.
+9. Tone: genuine and casual, like a quick phone review, never a brochure testimonial.
+10. No stacked filler adjectives (not "friendly, professional and responsive staff"). Praise ONE specific thing per review."""
+
+
 def build_prompt(cfg: GenerateIn, count: int) -> str:
+    if cfg.humanize:
+        lines = [
+            f'Write exactly {count} Google review drafts for "{cfg.business_name}", a {cfg.business_category} in {cfg.location}.',
+            HUMANIZE_RULES,
+            f'Language: write them in {cfg.language}. Use only that language and its script — never mix in words from another script.',
+            f'Use these search keywords in only about half of the reviews, one keyword each, and only where it reads like natural speech (never forced or grammatically odd): {cfg.keywords}.',
+        ]
+        if cfg.usp:
+            lines.append(f'Real things about this business you can mention: {cfg.usp}.')
+        if cfg.service_area:
+            lines.append(f'Nearby areas that can be mentioned occasionally: {cfg.service_area}.')
+        if cfg.other_suggestion:
+            lines.append(f'Extra instruction from the owner: {cfg.other_suggestion}.')
+        lines.append('No numbering, no quotes, no hashtags, no emojis, never mention being AI generated.')
+        lines.append('Return ONLY a JSON array of strings.')
+        return '\n'.join(lines)
     tone = 'a different tone for each review (friendly, storytelling, short and direct, natural, detailed)' if cfg.tone.startswith('Mixed') else f'a {cfg.tone} tone'
     lines = [
         f'Write exactly {count} Google review drafts for "{cfg.business_name}", a {cfg.business_category} in {cfg.location}.',
